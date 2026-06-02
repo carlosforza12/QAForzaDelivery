@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pages.forza_page import ForzaPage
 
 # Cargamos el archivo de características (Ajusta la ruta según tu proyecto)
-scenarios('../features/portal_creacion_guias_u.feature')
+scenarios('../features/portal_creacion_guias_ui.feature')
 scenarios('../features/recoleccion.feature')
 
 # ==============================================================================

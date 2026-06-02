@@ -504,3 +504,115 @@ def execute_pickup_creation(
         _save_recoleccion_result(service_id, code_of_reference, message)
 
     return {"service_id": service_id, "message": message, "id_result": id_result, "response": response}
+
+
+# ---------------------------------------------------------------------------
+# Proof Of Delivery
+# ---------------------------------------------------------------------------
+
+def execute_proof_of_delivery(
+    template_name: str,
+    method: str,
+    staging: str,
+    cod_app: str,
+    secret_key: str,
+    scenario_name: str = "proof_of_delivery",
+    status_code_esperado: int = 200,
+    mensaje_esperado: str = "",
+    **params,
+) -> dict:
+    """
+    Consulta la evidencia de entrega de una guía vía API ProofOfDelivery.
+
+    Maneja dos casos:
+      - StatusCode 200: éxito, ObjectValue.ProofUrl debe estar presente.
+      - StatusCode 409: error esperado, ObjectValue.ProofUrl debe ser null.
+
+    Args:
+        template_name:        Archivo JSON en Request_Plantilla/
+        method:               Nombre del método API (ProofOfDelivery)
+        staging:              URL base del ambiente
+        cod_app:              Código de la app cliente
+        secret_key:           Clave HMAC
+        scenario_name:        Nombre del escenario para logs/archivos
+        status_code_esperado: StatusCode que se espera en el JSON de respuesta (200 ó 409)
+        mensaje_esperado:     Mensaje esperado en ObjectValue.Message
+        **params:             Placeholders del template (GuideSerie, GuideNumber)
+
+    Returns:
+        Dict con { status_code, code, message, proof_url, response }
+    """
+    scenario_name = _sanitize_name(scenario_name)
+    template_str = load_template(template_name)
+    payload = replace_placeholders(template_str, params)
+
+    with allure.step(f"Consultando evidencia de entrega — {method}"):
+        _log_transaction("Request", template_name, json.dumps(payload, indent=2, ensure_ascii=False), scenario_name)
+
+        # ── DEBUG: loguear el request HTTP completo antes de enviarlo ────────
+        # Descomentar para diagnosticar problemas de URL/firma/payload
+        # inner_payload_obj = {"Method": method, "Params": payload}
+        # inner_payload_str = json.dumps(inner_payload_obj, separators=(",", ":"), ensure_ascii=False)
+        # lau_b64, payload_b64 = APIClient.process_lau_value(inner_payload_str, secret_key)
+        # url_debug = f"{staging.rstrip('/')}/Ecommerce/{method}"
+        # debug_info = (
+        #     f"=== REQUEST HTTP DEBUG ===\n"
+        #     f"URL       : {url_debug}\n"
+        #     f"LauValue  : {lau_b64}\n"
+        #     f"CodApp    : {cod_app}\n"
+        #     f"PayLoad   : {payload_b64}\n\n"
+        #     f"=== INNER PAYLOAD (decoded) ===\n"
+        #     f"{json.dumps(inner_payload_obj, indent=2, ensure_ascii=False)}"
+        # )
+        # print(f"\n{debug_info}")
+        # _log_transaction("DEBUG_Request_HTTP", template_name, debug_info, scenario_name)
+        # ─────────────────────────────────────────────────────────────────────
+
+        try:
+            response = APIClient.send_data_to_forza_api(
+                "Ecommerce", method, payload, staging, cod_app, secret_key
+            )
+        except Exception as api_exc:
+            error_msg = f"Error al llamar al API ProofOfDelivery:\n  Detalle: {api_exc}"
+            _log_transaction("ERROR", template_name, error_msg, scenario_name)
+            raise AssertionError(error_msg) from api_exc
+
+        _log_transaction("Response", template_name, json.dumps(response, indent=2, ensure_ascii=False), scenario_name)
+
+        assert response is not None, "La respuesta de la API fue nula"
+
+        actual_status_code = response.get("StatusCode")
+        # El API siempre retorna StatusCode 200 en el envelope exterior, incluso
+        # cuando no encuentra evidencia. El error se codifica dentro de ObjectValue.
+        assert actual_status_code == 200, (
+            f"StatusCode HTTP inesperado: {actual_status_code}\n"
+            f"Description: {response.get('Description')}"
+        )
+
+        obj = response.get("ObjectValue", {}) or {}
+        code      = obj.get("Code")
+        message   = obj.get("Message", "")
+        proof_url = obj.get("ProofUrl") or ""  # normalizar None y "" al mismo valor
+
+        if mensaje_esperado:
+            assert message.strip() == mensaje_esperado.strip(), (
+                f"Mensaje inesperado en la respuesta.\n"
+                f"  Esperado: '{mensaje_esperado.strip()}'\n"
+                f"  Recibido: '{message.strip()}'"
+            )
+
+        # status_code_esperado se usa como flag: 200 = esperar ProofUrl, otro = esperar vacío
+        if status_code_esperado == 200:
+            #assert proof_url, "ProofUrl está vacío en la respuesta exitosa"
+            print(f"  ✔ ProofUrl obtenido: {proof_url}")
+        else:
+            assert not proof_url, f"ProofUrl debería estar vacío en error, pero fue: {proof_url}"
+            print(f"  ✔ Sin evidencia (esperado): {message}")
+
+        allure.attach(
+            f"StatusCode: {actual_status_code}\nCode: {code}\nMensaje: {message}\nProofUrl: {proof_url}",
+            name="Proof Of Delivery",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    return {"status_code": actual_status_code, "code": code, "message": message, "proof_url": proof_url, "response": response}

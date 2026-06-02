@@ -18,11 +18,12 @@ from pytest_bdd import scenarios, given, parsers
 
 import allure
 
-from api.request_builder import execute_guide_creation, execute_pickup_creation
+from api.request_builder import execute_guide_creation, execute_pickup_creation, execute_proof_of_delivery
 
 # Cargar todos los escenarios de los features API
 scenarios("../features/creacion_guia_api.feature")
 scenarios("../features/ordenes_recoleccion_api.feature")
+scenarios("../features/proof_of_delivery_api.feature")
 
 
 def _scenario_name(request) -> str:
@@ -98,6 +99,10 @@ def step_seleccionar_request_api(datatable, api_context: dict, request) -> None:
     cod_app       = params["CodApp"]
     secret_key    = params["SecretKey"]
     cantidad      = int(params.get("cantidad", 1))
+
+    staging_urls = getattr(request.config, "_staging_urls", [])
+    if staging and staging not in staging_urls:
+        staging_urls.append(staging)
 
     # ── Parámetros del contenedor (opcionales) ────────────────────────────────
     crear_contenedor = params.get("CrearContenedor", "false").strip().lower() == "true"
@@ -177,6 +182,10 @@ def step_crear_recoleccion_api(datatable, api_context: dict, request) -> None:
     secret_key       = params["SecretKey"]
     mensaje_esperado = params.get("MensajeEsperado", "")
 
+    staging_urls = getattr(request.config, "_staging_urls", [])
+    if staging and staging not in staging_urls:
+        staging_urls.append(staging)
+
     skip_keys = {"request", "metodo", "staging", "CodApp", "SecretKey",
                  "MensajeEsperado", "ejecutarStaging", "Escenario"}
     template_params = {k: v for k, v in params.items() if k not in skip_keys}
@@ -194,3 +203,56 @@ def step_crear_recoleccion_api(datatable, api_context: dict, request) -> None:
         )
 
     api_context["pickup"] = result
+
+
+# ==============================================================================
+# PROOF OF DELIVERY
+# ==============================================================================
+
+@given("El usuario consulta la evidencia de entrega API")
+def step_consultar_proof_of_delivery(datatable, api_context: dict, request) -> None:
+    """
+    Consulta la evidencia de entrega de una guía vía ProofOfDelivery.
+
+    Columnas requeridas en la tabla:
+        request, metodo, staging, CodApp, SecretKey, GuideSerie, GuideNumber
+
+    Columnas opcionales:
+        StatusCodeEsperado (default 200), MensajeEsperado
+    """
+    headers = [cell for cell in datatable[0]]
+    values  = [cell for cell in datatable[1]]
+    params  = dict(zip(headers, values))
+
+    scenario_name = _scenario_name(request)
+
+    template_name        = params["request"]
+    method               = params["metodo"]
+    staging              = params["staging"]
+    cod_app              = params["CodApp"]
+    secret_key           = params["SecretKey"]
+    status_code_esperado = int(params.get("StatusCodeEsperado", 200))
+    mensaje_esperado     = params.get("MensajeEsperado", "")
+
+    staging_urls = getattr(request.config, "_staging_urls", [])
+    if staging and staging not in staging_urls:
+        staging_urls.append(staging)
+
+    skip_keys = {"request", "metodo", "staging", "CodApp", "SecretKey",
+                 "StatusCodeEsperado", "MensajeEsperado", "ejecutarStaging", "Escenario"}
+    template_params = {k: v for k, v in params.items() if k not in skip_keys}
+
+    with allure.step(f"Proof of Delivery — {method}"):
+        result = execute_proof_of_delivery(
+            template_name=template_name,
+            method=method,
+            staging=staging,
+            cod_app=cod_app,
+            secret_key=secret_key,
+            scenario_name=scenario_name,
+            status_code_esperado=status_code_esperado,
+            mensaje_esperado=mensaje_esperado,
+            **template_params,
+        )
+
+    api_context["proof_of_delivery"] = result

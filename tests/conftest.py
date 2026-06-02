@@ -12,6 +12,10 @@ from pages.forza_page import ForzaPage
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
+def pytest_configure(config):
+    config._staging_urls = []
+
+
 def pytest_sessionfinish(session, exitstatus):
     try:
         # 1. Generar reporte Allure (HTML estático)
@@ -63,7 +67,8 @@ def pytest_sessionfinish(session, exitstatus):
                 summary["execution_name"] = safe_name
                 summary["tests_requested"] = "all"
                 summary["allure_report"] = str(output_dir / "report.html")
-                summary["base_url"] = os.getenv("BASE_URL", "https://qa.portal.forzadelivery.com/")
+                staging_urls = getattr(session.config, "_staging_urls", [])
+                summary["base_url"] = staging_urls[0] if staging_urls else os.getenv("BASE_URL", "https://qa.portal.forzadelivery.com/")
                 
                 # Generar documentos (usa OpenRouter)
                 documents_dir = Path(os.path.join(os.path.dirname(__file__), "..", "reportes"))
