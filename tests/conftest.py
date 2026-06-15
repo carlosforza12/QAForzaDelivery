@@ -110,54 +110,57 @@ def pytest_sessionfinish(session, exitstatus):
         print(f"\nReporte Allure generado: {output_file_win}")
         
         # 2. Parsear JUnit XML y generar documentos
-        try:
-            from reporting.execution_summary_parser import parse_junit_summary
-            from reporting.documents_generator import generate_documents
-            from reporting.feature_metadata_parser import parse_feature_metadata
-            from integrations.atlassian.confluence_client import publish_execution_to_confluence
+        if os.getenv("FINAL_REPORT_ENABLED", "true").lower() != "true":
+            print("\n[Final Report] Desactivado. Para activar usar FINAL_REPORT_ENABLED=true")
+        else:
+            try:
+                from reporting.execution_summary_parser import parse_junit_summary
+                from reporting.documents_generator import generate_documents
+                from reporting.feature_metadata_parser import parse_feature_metadata
+                from integrations.atlassian.confluence_client import publish_execution_to_confluence
 
-            junit_xml = Path(os.path.join(os.path.dirname(__file__), "..", "reportes", "junit-results.xml"))
-            if junit_xml.exists():
-                summary = parse_junit_summary(junit_xml)
-                summary["execution_name"] = safe_name
-                summary["tests_requested"] = "all"
-                summary["allure_report"] = str(output_dir / "report.html")
-                staging_urls = getattr(session.config, "_staging_urls", [])
-                summary["base_url"] = staging_urls[0] if staging_urls else os.getenv("BASE_URL", "https://qa.portal.forzadelivery.com/")
+                junit_xml = Path(os.path.join(os.path.dirname(__file__), "..", "reportes", "junit-results.xml"))
+                if junit_xml.exists():
+                    summary = parse_junit_summary(junit_xml)
+                    summary["execution_name"] = safe_name
+                    summary["tests_requested"] = "all"
+                    summary["allure_report"] = str(output_dir / "report.html")
+                    staging_urls = getattr(session.config, "_staging_urls", [])
+                    summary["base_url"] = staging_urls[0] if staging_urls else os.getenv("BASE_URL", "https://qa.portal.forzadelivery.com/")
 
-                # Generar documentos HTML (usa OpenRouter) — la narrativa queda en el resultado
-                documents_dir = Path(os.path.join(os.path.dirname(__file__), "..", "reportes"))
-                documents_dir.mkdir(parents=True, exist_ok=True)
-                if os.getenv("OPENROUTER_API_KEY"):
-                    generated_docs = generate_documents(summary=summary, output_dir=documents_dir)
-                else:
-                    generated_docs = {}
-                    print("\n[OpenRouter] Generación de documentos desactivada: falta OPENROUTER_API_KEY")
+                    # Generar documentos HTML (usa OpenRouter) — la narrativa queda en el resultado
+                    documents_dir = Path(os.path.join(os.path.dirname(__file__), "..", "reportes"))
+                    documents_dir.mkdir(parents=True, exist_ok=True)
+                    if os.getenv("OPENROUTER_API_KEY"):
+                        generated_docs = generate_documents(summary=summary, output_dir=documents_dir)
+                    else:
+                        generated_docs = {}
+                        print("\n[OpenRouter] Generación de documentos desactivada: falta OPENROUTER_API_KEY")
 
-                # Generar reporte de cierre en PDF si está habilitado
-                if os.getenv("PDF_REPORT_ENABLED", "false").lower() == "true":
-                    try:
-                        from reporting.pdf_report_generator import generate_pdf_report
-                        # Reutiliza la narrativa ya generada por generate_documents (sin segunda llamada a la IA)
-                        narrative = generated_docs.get("narrative", {})
-                        feature_meta = parse_feature_metadata(feature_path)
-                        generate_pdf_report(
-                            summary=summary,
-                            feature_meta=feature_meta,
-                            narrative=narrative,
-                            output_dir=documents_dir,
-                        )
-                    except Exception as pdf_err:
-                        print(f"\n[PDF Report] Error al generar PDF: {pdf_err}")
+                    # Generar reporte de cierre en PDF si está habilitado
+                    if os.getenv("PDF_REPORT_ENABLED", "false").lower() == "true":
+                        try:
+                            from reporting.pdf_report_generator import generate_pdf_report
+                            # Reutiliza la narrativa ya generada por generate_documents (sin segunda llamada a la IA)
+                            narrative = generated_docs.get("narrative", {})
+                            feature_meta = parse_feature_metadata(feature_path)
+                            generate_pdf_report(
+                                summary=summary,
+                                feature_meta=feature_meta,
+                                narrative=narrative,
+                                output_dir=documents_dir,
+                            )
+                        except Exception as pdf_err:
+                            print(f"\n[PDF Report] Error al generar PDF: {pdf_err}")
 
-                # Publicar en Confluence si está habilitado
-                if os.getenv("ATLASSIAN_SYNC_ENABLED", "false").lower() == "true":
-                    zip_path = documents_dir / "evidencias.zip"
-                    publish_execution_to_confluence(summary=summary, documents=generated_docs, zip_path=zip_path)
-                else:
-                    print("\n[Atlassian] Sincronización desactivada. Para activar usar variable ATLASSIAN_SYNC_ENABLED=true")
-        except ImportError as e:
-            print(f"\nNo se pudieron generar documentos: {e}")
+                    # Publicar en Confluence si está habilitado
+                    if os.getenv("ATLASSIAN_SYNC_ENABLED", "false").lower() == "true":
+                        zip_path = documents_dir / "evidencias.zip"
+                        publish_execution_to_confluence(summary=summary, documents=generated_docs, zip_path=zip_path)
+                    else:
+                        print("\n[Atlassian] Sincronización desactivada. Para activar usar variable ATLASSIAN_SYNC_ENABLED=true")
+            except ImportError as e:
+                print(f"\nNo se pudieron generar documentos: {e}")
             
     except Exception as e:
         print(f"\nError en pytest_sessionfinish: {e}")
