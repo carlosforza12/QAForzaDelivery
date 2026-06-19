@@ -1,5 +1,6 @@
 from pytest_bdd import scenarios, given, when, then, parsers
 from dataclasses import dataclass
+import re
 from pages.forza_page import ForzaPage
 
 # Cargamos el archivo de características (Ajusta la ruta según tu proyecto)
@@ -8,6 +9,7 @@ scenarios('../features/recoleccion.feature')
 scenarios('../features/portal_corporativo_ui.feature')
 scenarios('../features/portal_exec_ui.feature')
 scenarios('../features/mis_envios_exec.feature')
+scenarios('../features/el-Rastreo.feature')
 
 # ==============================================================================
 # MODELO DE DATOS
@@ -215,6 +217,72 @@ def step_verificar_rastreo(forza_page: ForzaPage):
 def step_verificar_generar_excel(forza_page: ForzaPage):
     forza_page.verificar_boton_generar_excel()
     forza_page.abrir_modal_generar_excel()
+
+
+# ======================================================================
+# PASOS PARA EL FEATURE el-Rastreo
+# ======================================================================
+
+
+@given(parsers.parse('el usuario selecciona la opcion "{opcion}"'))
+def step_seleccionar_opcion(forza_page: ForzaPage, opcion: str):
+    strategies = [
+        ("title", lambda: forza_page.page.get_by_title(opcion)),
+        ("text_exact", lambda: forza_page.page.get_by_text(opcion, exact=True)),
+        ("text_partial", lambda: forza_page.page.get_by_text(opcion, exact=False)),
+        ("role_button", lambda: forza_page.page.get_by_role("button", name=opcion)),
+        ("role_link", lambda: forza_page.page.get_by_role("link", name=opcion)),
+        ("role_menuitem", lambda: forza_page.page.get_by_role("menuitem", name=opcion)),
+    ]
+
+    clicked = False
+    for name, fn in strategies:
+        try:
+            locator = fn()
+            if locator.count() > 0:
+                locator.first.click(timeout=8000)
+                clicked = True
+                break
+        except Exception:
+            continue
+
+    if not clicked:
+        raise AssertionError(f"No se pudo encontrar la opción '{opcion}' con las estrategias conocidas")
+
+    forza_page._take_screenshot("opcion_selected")
+
+
+@given(parsers.parse('el usuario ingresa el numero de guia "{numero_guia}"'))
+@when(parsers.parse('el usuario ingresa el numero de guia "{numero_guia}"'))
+def step_ingresar_numero_guia(forza_page: ForzaPage, numero_guia: str):
+    try:
+        input_locator = forza_page.page.get_by_placeholder("Número de guía")
+        if input_locator.count() > 0:
+            input_locator.fill(numero_guia)
+            forza_page._take_screenshot("guia_ingresada")
+            return
+    except Exception:
+        pass
+
+    inputs = forza_page.page.locator("input:not([type='hidden'])")
+    if inputs.count() > 0:
+        inputs.first.fill(numero_guia)
+        forza_page._take_screenshot("guia_ingresada")
+        return
+
+    raise AssertionError("No se encontró un campo de entrada para el número de guía")
+
+
+@then('el usuario hace click en el boton RASTREAR')
+def step_click_rastrear(forza_page: ForzaPage):
+    try:
+        forza_page.page.get_by_role("button", name=re.compile(r"rastrea", re.I)).click(timeout=10000)
+    except Exception:
+        try:
+            forza_page.page.get_by_text("RASTREAR", exact=True).click(timeout=10000)
+        except Exception:
+            forza_page.page.get_by_text("Rastrear", exact=False).click(timeout=10000)
+    forza_page._take_screenshot("click_rastrear")
 
 @then("el botón Reimprimir Guías está deshabilitado inicialmente y se habilita al seleccionar una guía")
 def step_verificar_reimprimir_guias(forza_page: ForzaPage):
