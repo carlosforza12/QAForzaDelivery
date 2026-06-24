@@ -68,8 +68,8 @@ Feature: Proof Of Delivery API
       | <request> | <metodo> | <staging> | <CodApp> | <SecretKey> | <GuideSerie> | <GuideNumber> | <StatusCodeEsperado> | <MensajeEsperado> |
 
     Examples:
-      | Escenario | request                          | metodo          | staging                           | CodApp                    | SecretKey                        | GuideSerie | GuideNumber | StatusCodeEsperado | MensajeEsperado                |
-      | exitoso   | plantilla_proof_of_delivery.json | ProofOfDelivery | https://apicore.forzadelivery.io/ | SICPXSAPIECOM250620241123 | sTMQdkrMTQxNGc3jo3795qvZvht8uRrf | FD         | 34367366    | 200                | Operación realizada con éxito. |
+      | Escenario | request                          | metodo          | staging                             | CodApp                                             | SecretKey                        | GuideSerie | GuideNumber | StatusCodeEsperado | MensajeEsperado                |
+      | exitoso   | plantilla_proof_of_delivery.json | ProofOfDelivery | https://apidockin.forzadelivery.io/ | SISRADIANCESEAHONGKONGLIMITEDGTAPIECOM160320260801 | RyngsmS42yXlKnJ90uc92SIfFFq2wX6B | FD         | 35208493    | 200                | Operación realizada con éxito. |
 
   @code_409_prod @proof_of_delivery_produccion
   Scenario Outline: Consulta de evidencia de entrega - guia sin evidencia code 409 (prod)
@@ -78,8 +78,8 @@ Feature: Proof Of Delivery API
       | <request> | <metodo> | <staging> | <CodApp> | <SecretKey> | <GuideSerie> | <GuideNumber> | <StatusCodeEsperado> | <MensajeEsperado> |
 
     Examples:
-      | Escenario     | request                          | metodo          | staging                           | CodApp                    | SecretKey                        | GuideSerie | GuideNumber | StatusCodeEsperado | MensajeEsperado                                                |
-      | sin_evidencia | plantilla_proof_of_delivery.json | ProofOfDelivery | https://apicore.forzadelivery.io/ | SICPXSAPIECOM250620241123 | sTMQdkrMTQxNGc3jo3795qvZvht8uRrf | FD         | 2390390     | 409                | No se encontró evidencia de entrega para la guía proporcionada |
+      | Escenario     | request                          | metodo          | staging                             | CodApp                                             | SecretKey                        | GuideSerie | GuideNumber | StatusCodeEsperado | MensajeEsperado                                                |
+      | sin_evidencia | plantilla_proof_of_delivery.json | ProofOfDelivery | https://apidockin.forzadelivery.io/ | SISRADIANCESEAHONGKONGLIMITEDGTAPIECOM160320260801 | RyngsmS42yXlKnJ90uc92SIfFFq2wX6B | FD         | 2390390     | 409                | No se encontró evidencia de entrega para la guía proporcionada |
 
   @code_404_prod @proof_of_delivery_produccion
   Scenario Outline: Consulta de evidencia de entrega - guia inexistente code 404 (prod)
@@ -88,8 +88,8 @@ Feature: Proof Of Delivery API
       | <request> | <metodo> | <staging> | <CodApp> | <SecretKey> | <GuideSerie> | <GuideNumber> | <StatusCodeEsperado> | <MensajeEsperado> |
 
     Examples:
-      | Escenario   | request                          | metodo          | staging                           | CodApp                    | SecretKey                        | GuideSerie | GuideNumber | StatusCodeEsperado | MensajeEsperado                                   |
-      | inexistente | plantilla_proof_of_delivery.json | ProofOfDelivery | https://apicore.forzadelivery.io/ | SICPXSAPIECOM250620241123 | sTMQdkrMTQxNGc3jo3795qvZvht8uRrf | FD         | 99999999    | 404                | El número o serie de guía no existe en el sistema |
+      | Escenario   | request                          | metodo          | staging                             | CodApp                                             | SecretKey                        | GuideSerie | GuideNumber | StatusCodeEsperado | MensajeEsperado                                   |
+      | inexistente | plantilla_proof_of_delivery.json | ProofOfDelivery | https://apidockin.forzadelivery.io/ | SISRADIANCESEAHONGKONGLIMITEDGTAPIECOM160320260801 | RyngsmS42yXlKnJ90uc92SIfFFq2wX6B | FD         | 99999999    | 404                | El número o serie de guía no existe en el sistema |
 
   @code_400_prod @proof_of_delivery_produccion
   Scenario Outline: Consulta de evidencia de entrega - parametros invalidos code 400 (prod)
@@ -98,8 +98,8 @@ Feature: Proof Of Delivery API
       | <request> | <metodo> | <staging> | <CodApp> | <SecretKey> | <GuideSerie> | <GuideNumber> | <StatusCodeEsperado> | <MensajeEsperado> |
 
     Examples:
-      | Escenario   | request                          | metodo          | staging                           | CodApp                    | SecretKey                        | GuideSerie | GuideNumber | StatusCodeEsperado | MensajeEsperado                                            |
-      | serie_vacia | plantilla_proof_of_delivery.json | ProofOfDelivery | https://apicore.forzadelivery.io/ | SICPXSAPIECOM250620241123 | sTMQdkrMTQxNGc3jo3795qvZvht8uRrf |            | 30775499    | 400                | Los parámetros enviados no son válidos o están incompletos |
+      | Escenario   | request                          | metodo          | staging                             | CodApp                                             | SecretKey                        | GuideSerie | GuideNumber | StatusCodeEsperado | MensajeEsperado                                            |
+      | serie_vacia | plantilla_proof_of_delivery.json | ProofOfDelivery | https://apidockin.forzadelivery.io/ | SISRADIANCESEAHONGKONGLIMITEDGTAPIECOM160320260801 | RyngsmS42yXlKnJ90uc92SIfFFq2wX6B |            | 30775499    | 400                | Los parámetros enviados no son válidos o están incompletos |
 
   @code_500_prod @proof_of_delivery_produccion
   Scenario Outline: Consulta de evidencia de entrega - error interno del servidor code 500 (prod)
@@ -108,5 +108,5 @@ Feature: Proof Of Delivery API
       | <request> | <metodo> | <staging> | <CodApp> | <SecretKey> | <GuideSerie> | <GuideNumber> | <StatusCodeEsperado> | <MensajeEsperado> |
 
     Examples:
-      | Escenario   | request                              | metodo          | staging                           | CodApp                    | SecretKey                        | GuideSerie | GuideNumber | StatusCodeEsperado | MensajeEsperado                         |
-      | params_null | plantilla_proof_of_delivery_500.json | ProofOfDelivery | https://apicore.forzadelivery.io/ | SICPXSAPIECOM250620241123 | sTMQdkrMTQxNGc3jo3795qvZvht8uRrf | FD         | 30775499    | 500                | Ocurrió un error interno en el servidor |
+      | Escenario   | request                              | metodo          | staging                             | CodApp                                             | SecretKey                        | GuideSerie | GuideNumber | StatusCodeEsperado | MensajeEsperado                         |
+      | params_null | plantilla_proof_of_delivery_500.json | ProofOfDelivery | https://apidockin.forzadelivery.io/ | SISRADIANCESEAHONGKONGLIMITEDGTAPIECOM160320260801 | RyngsmS42yXlKnJ90uc92SIfFFq2wX6B | FD         | 30775499    | 500                | Ocurrió un error interno en el servidor |

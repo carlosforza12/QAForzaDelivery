@@ -51,3 +51,15 @@ Feature: Intercept And Return API
     Examples:
       | Escenario | request                             | metodo             | staging                 | CodApp                   | SecretKey                        | GuideNumber | StatusCodeEsperado | DescriptionEsperada                                    | StatusEsperado | CountryIdEsperado | MessageEsperado                             |
       | no_existe | plantilla_intercept_and_return.json | InterceptAndReturn | http://localhost:59798/ | SIFDCAPIECOM230920201910 | SHyKQDB3K6dfHxR3Dbqw45CQMv65vgkX | FD63251241  | 404                | NotFound - Número de guía no encontrado en el sistema. |                |                   | Número de guía no encontrado en el sistema. |
+
+
+  @bloquear_entrega_exitoso_produccion
+  Scenario Outline: Bloqueo de entrega creado por primera vez - Intercept and Return produccion
+    Given El usuario ejecuta intercept and return API
+      | request   | metodo   | staging   | CodApp   | SecretKey   | GuideNumber   | StatusCodeEsperado   | DescriptionEsperada   | StatusEsperado   | CountryIdEsperado   | MessageEsperado   |
+      | <request> | <metodo> | <staging> | <CodApp> | <SecretKey> | <GuideNumber> | <StatusCodeEsperado> | <DescriptionEsperada> | <StatusEsperado> | <CountryIdEsperado> | <MessageEsperado> |
+
+    Examples:
+      | Escenario     | request                             | metodo             | staging                             | CodApp                                             | SecretKey                        | GuideNumber | StatusCodeEsperado | DescriptionEsperada | StatusEsperado                                  | CountryIdEsperado | MessageEsperado |
+      | bloqueo_nuevo | plantilla_intercept_and_return.json | InterceptAndReturn | https://apidockin.forzadelivery.io/ | SISRADIANCESEAHONGKONGLIMITEDGTAPIECOM160320260801 | RyngsmS42yXlKnJ90uc92SIfFFq2wX6B | FD35209566  | 200                | Success             | El remitente bloqueo la entrega de este paquete | SV                |                 |
+
