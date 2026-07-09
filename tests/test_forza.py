@@ -1,5 +1,6 @@
 from pytest_bdd import scenarios, given, when, then, parsers
 from dataclasses import dataclass
+import os
 from pages.forza_page import ForzaPage
 
 # Cargamos el archivo de características (Ajusta la ruta según tu proyecto)
@@ -20,10 +21,35 @@ class Direccion:
     collet: str
     tarjeta: str 
 
+@dataclass
+class Devolucion:
+    pais: str
+    destino: str
+    tipo_guia: str
+    tipo_entrega: str
+    tipo_cobro: str
+    referencia_destino: str
+    poblado: str
+    nombre_contacto: str
+    telefono: str
+    direccion_remitente: str
+
 # ==============================================================================
 # DEFINICIÓN DE PASOS (Steps)
 # 
 # ==============================================================================
+
+def resolve_test_value(value: str) -> str:
+    value = value or ""
+    if value.strip() in ("-", "N/A"):
+        return ""
+    if value.startswith("ENV:"):
+        env_key = value.split(":", 1)[1]
+        env_value = os.getenv(env_key)
+        if not env_value:
+            raise ValueError(f"No se encontró la variable de entorno requerida: {env_key}")
+        return env_value
+    return value
 
 @given(parsers.parse('el usuario selecciona la url del portal de forza "{url}" y el titulo de la pagina es "{titulo}"'))
 def step_seleccionar_url_y_titulo(forza_page: ForzaPage, url: str, titulo: str):
@@ -44,7 +70,7 @@ def step_set_entorno(forza_page: ForzaPage, entorno: str):
 
 @given(parsers.parse('el usuario ingresa el correo "{usuario}" y el pass "{contrasenia}"'))
 def step_ingresar_credenciales(forza_page: ForzaPage, usuario: str, contrasenia: str):
-    forza_page.login(usuario, contrasenia)
+    forza_page.login(resolve_test_value(usuario), resolve_test_value(contrasenia))
 
 @given(parsers.parse('el usuario elige el tipo de guia crear {tipo_servicio}'))
 def step_elegir_tipo_guia(forza_page: ForzaPage, tipo_servicio: str):
@@ -71,7 +97,7 @@ def step_indicar_cantidad_guias(forza_page, cantidad: int, direccion: Direccion)
 
 @given(parsers.parse('el usuario ingresa el codigo "{codigo}" el usuario "{usuario}" y su pass "{contrasenia}"'))
 def step_login_corp(forza_page: ForzaPage, codigo: str, usuario: str, contrasenia: str):
-    forza_page.login_corp(codigo, usuario, contrasenia)
+    forza_page.login_corp(resolve_test_value(codigo), resolve_test_value(usuario), resolve_test_value(contrasenia))
 
 @given('el usuario selecciona la opcion pare crear guias')
 def step_opcion_crear_guias(forza_page: ForzaPage):
@@ -99,6 +125,29 @@ def step_datos_corp(tipo_guia: str, collet: str):
         collet=collet,
         tarjeta="",
     )
+
+@given(parsers.parse('datos para crear devolucion pais "{pais}" destino "{destino}" tipo "{tipo_guia}" entrega "{tipo_entrega}" cobro "{tipo_cobro}" referencia "{referencia_destino}" poblado "{poblado}" nombre "{nombre_contacto}" telefono "{telefono}" direccion "{direccion_remitente}"'), target_fixture="devolucion")
+def step_datos_devolucion(pais: str, destino: str, tipo_guia: str, tipo_entrega: str, tipo_cobro: str, referencia_destino: str, poblado: str, nombre_contacto: str, telefono: str, direccion_remitente: str):
+    return Devolucion(
+        pais=pais,
+        destino=destino,
+        tipo_guia=tipo_guia,
+        tipo_entrega=tipo_entrega,
+        tipo_cobro=tipo_cobro,
+        referencia_destino=resolve_test_value(referencia_destino),
+        poblado=resolve_test_value(poblado),
+        nombre_contacto=resolve_test_value(nombre_contacto),
+        telefono=resolve_test_value(telefono),
+        direccion_remitente=resolve_test_value(direccion_remitente),
+    )
+
+@then('el usuario inicia el proceso de servicio de devolucion')
+def step_iniciar_servicio_devolucion(forza_page: ForzaPage, devolucion: Devolucion):
+    forza_page.crear_guia_devolucion_corp(devolucion)
+
+@then('el usuario valida la guia de devolucion creada en mis envios')
+def step_validar_devolucion_mis_envios(forza_page: ForzaPage):
+    forza_page.validar_guia_devolucion_en_mis_envios()
 
 @given(parsers.parse('datos exec para crear guia tipo "{tipo_guia}" collet "{collet}"'), target_fixture="direccion")
 def step_datos_exec(tipo_guia: str, collet: str):
