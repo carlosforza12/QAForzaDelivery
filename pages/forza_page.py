@@ -340,7 +340,8 @@ class ForzaPage:
                 if locator.count() > 0:
                     locator.first.click(timeout=10000)
                     self.page.wait_for_load_state("networkidle", timeout=20000)
-                    self._take_screenshot("servicio_recepcion_selected")
+                    opcion_slug = re.sub(r"[^a-z0-9]+", "_", opcion.lower()).strip("_")
+                    self._take_screenshot(f"servicio_{opcion_slug}_selected")
                     return
             except Exception:
                 continue
@@ -378,11 +379,33 @@ class ForzaPage:
         if nombre_boton.strip().lower() == "agregar":
             boton = self.page.get_by_role("button", name=re.compile(r"^Agregar$", re.I))
             if boton.count() == 0:
-                boton = self.page.get_by_text("Agregar", exact=True)
+                boton = self.page.get_by_role("button", name="AGREGAR")
+            if boton.count() == 0:
+                boton = self.page.get_by_text("AGREGAR", exact=True)
+            if boton.count() == 0:
+                boton = self.page.locator("button:has-text('AGREGAR')")
+            if boton.count() == 0:
+                boton = self.page.get_by_text(re.compile(r"^AGREGAR$", re.I))
         elif nombre_boton.strip().lower() == "finalizar":
             boton = self.page.get_by_role("button", name=re.compile(r"checkmark\s*circle\s*outline", re.I))
             if boton.count() == 0:
                 boton = self.page.get_by_text(re.compile(r"checkmark\s*circle\s*outline", re.I))
+            if boton.count() == 0:
+                boton = self.page.get_by_role("button", name=re.compile(r"^finalizar$", re.I))
+            if boton.count() == 0:
+                boton = self.page.get_by_text("FINALIZAR", exact=True)
+            if boton.count() == 0:
+                boton = self.page.locator("button:has-text('FINALIZAR')")
+            if boton.count() == 0:
+                boton = self.page.get_by_text(re.compile(r"^finalizar$", re.I))
+            if boton.count() == 0:
+                boton = self.page.get_by_title("Finalizar y pagar")
+            if boton.count() == 0:
+                boton = self.page.get_by_title(re.compile(r"finalizar", re.I))
+            if boton.count() == 0:
+                boton = self.page.locator("button[title*='Finalizar' i], [role='button'][title*='Finalizar' i]")
+            if boton.count() == 0:
+                boton = self.page.locator("button, [role='button']").filter(has_text=re.compile(r"finalizar", re.I))
         else:
             boton = self.page.get_by_role("button", name=re.compile(re.escape(nombre_boton), re.I))
             if boton.count() == 0:
@@ -394,6 +417,27 @@ class ForzaPage:
         boton.first.click(timeout=10000)
         self.page.wait_for_timeout(800)
         self._take_screenshot(f"boton_{re.sub(r'[^a-z0-9]', '_', nombre_boton.lower())}_clicked")
+
+    @allure.step("Click en botón CONTINUAR en EXEC")
+    def click_boton_continuar_exec(self, nombre_boton: str = "CONTINUAR"):
+        boton = self.page.get_by_role("button", name="Continuar chevron forward")
+        if boton.count() == 0:
+            boton = self.page.get_by_role("button", name=re.compile(r"continuar\s*chevron\s*forward", re.I))
+        if boton.count() == 0:
+            boton = self.page.get_by_role("button", name=re.compile(r"^continuar$", re.I))
+        if boton.count() == 0:
+            boton = self.page.get_by_text("CONTINUAR", exact=True)
+        if boton.count() == 0:
+            boton = self.page.locator("button:has-text('CONTINUAR'), [role='button']:has-text('CONTINUAR')")
+        if boton.count() == 0:
+            boton = self.page.locator("button, [role='button']").filter(has_text=re.compile(r"continuar", re.I))
+
+        if boton.count() == 0:
+            raise AssertionError(f"No se encontró el botón '{nombre_boton}'")
+
+        boton.first.click(timeout=10000)
+        self.page.wait_for_timeout(800)
+        self._take_screenshot("boton_continuar_clicked")
 
     @allure.step("Ingresar nombre de cliente en EXEC")
     def ingresar_nombre_cliente_exec(self, nombre_cliente: str):
@@ -433,8 +477,8 @@ class ForzaPage:
         textbox.first.fill(dpi, timeout=10000)
         self._take_screenshot("dpi_ingresado")
 
-    @allure.step("Verificar link de devolución en EXEC")
-    def verificar_link_devolucion_exec(self, nombre_link: str):
+    @allure.step("Verificar link de servicio en EXEC")
+    def verificar_link_servicio_exec(self, nombre_link: str):
         link = self.page.get_by_role("link", name=nombre_link)
         if link.count() == 0:
             link = self.page.get_by_text(nombre_link, exact=False)
@@ -442,7 +486,16 @@ class ForzaPage:
             raise AssertionError(f"No se encontró el link '{nombre_link}'")
 
         expect(link.first).to_be_visible(timeout=10000)
-        self._take_screenshot("link_servicio_devolucion_visible")
+        link_slug = re.sub(r"[^a-z0-9]+", "_", nombre_link.lower()).strip("_")
+        self._take_screenshot(f"link_{link_slug}_visible")
+
+    @allure.step("Verificar link de recepción en EXEC")
+    def verificar_link_recepcion_exec(self, nombre_link: str):
+        self.verificar_link_servicio_exec(nombre_link)
+
+    @allure.step("Verificar link de devolución en EXEC")
+    def verificar_link_devolucion_exec(self, nombre_link: str):
+        self.verificar_link_servicio_exec(nombre_link)
 
     # ==============================================================================
     # FLUJO PRINCIPAL: CREACIÓN DE GUÍAS

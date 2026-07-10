@@ -145,6 +145,11 @@ def step_ingresar_guia_recepcion(forza_page: ForzaPage, guia: str, nombre_textbo
 def step_click_boton_por_nombre(forza_page: ForzaPage, nombre_boton: str):
     forza_page.click_boton_exec(nombre_boton)
 
+@given(parsers.parse('usuario hace click en boton "{nombre_boton}"'))
+@then(parsers.parse('usuario hace click en boton "{nombre_boton}"'))
+def step_click_boton_exec_continuar(forza_page: ForzaPage, nombre_boton: str):
+    forza_page.click_boton_continuar_exec(nombre_boton)
+
 @given(parsers.parse('el usuario ingresa el nombre de cliente "{nombre_cliente}"'))
 @then(parsers.parse('el usuario ingresa el nombre de cliente "{nombre_cliente}"'))
 def step_ingresar_nombre_cliente(forza_page: ForzaPage, nombre_cliente: str):
@@ -157,10 +162,14 @@ def step_ingresar_dpi(forza_page: ForzaPage, dpi: str):
 
 @then(parsers.parse('el usuario verifica el link "{nombre_link}"'))
 def step_verificar_link_devolucion(forza_page: ForzaPage, nombre_link: str):
-    forza_page.verificar_link_devolucion_exec(nombre_link)
+    forza_page.verificar_link_servicio_exec(nombre_link)
 
 @then('el usuario verifica Recepcion Exitosa')
 def step_verificar_recepcion_exitosa(forza_page: ForzaPage):
+    forza_page.verificar_link_recepcion_exec("chevron forward Servicio Recepción")
+
+@then('el usuario verifica Devolucion Exitosa')
+def step_verificar_devolucion_exitosa(forza_page: ForzaPage):
     forza_page.verificar_link_devolucion_exec("chevron forward Servicio Devolución")
 
 @then('el usuario inicia el proceso de creacion de guias en EXEC')
