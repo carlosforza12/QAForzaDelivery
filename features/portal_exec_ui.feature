@@ -41,9 +41,8 @@
       Y usuario selecciona la opcion Servicios
       Entonces el usuario visualiza el modulo de Servicios
       Y el usuario elige la opcion "Servicio Recepción"
-      Y el usuario ingresa la guia "FD30776255" en "Ingrese guía o referencia:"
+      Y el usuario ingresa la guia "FD30776256" en "Ingrese guía o referencia:"
       Y el usuario hace click en el boton "Agregar"
-      #Y usuario hace click en boton "CONTINUAR"
       Y el usuario ingresa el nombre de cliente "Tst QA"
       Y el usuario ingresa el DPI "2399479590908"
       Y el usuario hace click en el boton "Finalizar"
@@ -61,7 +60,7 @@
       Y usuario selecciona la opcion Servicios
       Entonces el usuario visualiza el modulo de Servicios
       Y el usuario elige la opcion "Servicio Devolución"
-      Y el usuario ingresa la guia "FD30776255" en "Ingrese guía o referencia:"
+      Y el usuario ingresa la guia "FD30776256" en "Ingrese guía o referencia:"
       Y el usuario hace click en el boton "Agregar"
       Y usuario hace click en boton "CONTINUAR"
       Y el usuario ingresa el nombre de cliente "Tst QA"
