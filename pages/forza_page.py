@@ -20,6 +20,8 @@ class ForzaPage:
         self.url_actual: str = ""
         self.token: str = ""
         self.entorno: str = ""
+        self.guia_generada: str = ""
+        self.pais_actual: str = ""
 
     def _take_screenshot(self, name: str = "screenshot"):
         try:
@@ -31,7 +33,16 @@ class ForzaPage:
     @allure.step("Navegar a la URL: '{url}'")
     def go_to_page_web(self, url: str):
         self.url_actual = url
-        self.page.goto(url, timeout=120000)
+        ultimo_error = None
+        for intento in range(3):
+            try:
+                self.page.goto(url, timeout=120000, wait_until="load")
+                break
+            except Exception as error:
+                ultimo_error = error
+                if intento == 2:
+                    raise
+                self.page.wait_for_timeout(5000)
         self._take_screenshot("navigation")
 
     @allure.step("Validar que el título sea: '{titulo_esperado}'")
@@ -41,8 +52,48 @@ class ForzaPage:
 
     @allure.step("Seleccionar país: '{country}'")
     def select_country(self, country: str):
+        self.pais_actual = country
         patron_regex = re.compile(f"^{re.escape(country)}$")
-        self.page.locator("div").filter(has_text=patron_regex).get_by_role("emphasis").click(timeout=30000)
+        test_ids_por_pais = {
+            "guatemala": "pw-login-option-country-gt",
+            "honduras": "pw-login-option-country-hn",
+            "el salvador": "pw-login-option-country-sv",
+        }
+        country_test_id = test_ids_por_pais.get(country.strip().lower())
+        opciones_pais = [
+            self.page.locator(f"[data-testid='{country_test_id}']") if country_test_id else self.page.locator("not-found"),
+            self.page.get_by_role("button", name=re.compile(country, re.IGNORECASE)),
+            self.page.locator("ion-item").filter(has_text=patron_regex),
+            self.page.locator(".container-icon").filter(has_text=patron_regex),
+            self.page.locator("div").filter(has_text=patron_regex).get_by_role("emphasis"),
+        ]
+
+        def login_visible():
+            usuario_corp = self.page.get_by_text("Usuario Corporativo", exact=True)
+            correo = self.page.get_by_text("Correo electrónico", exact=True)
+            return (
+                usuario_corp.count() > 0 and usuario_corp.first.is_visible()
+            ) or (
+                correo.count() > 0 and correo.first.is_visible()
+            )
+
+        for opcion in opciones_pais:
+            try:
+                if opcion.count() == 0:
+                    continue
+                opcion.first.click(timeout=10000, force=True)
+                try:
+                    self.page.wait_for_load_state("networkidle", timeout=10000)
+                except Exception:
+                    pass
+                self.page.wait_for_timeout(1000)
+                if login_visible():
+                    break
+            except Exception:
+                continue
+        else:
+            raise AssertionError(f"No se pudo seleccionar el país: {country}")
+
         self.page.wait_for_load_state("load")
         self._take_screenshot("country_selection")
 
@@ -86,20 +137,66 @@ class ForzaPage:
 
     @allure.step("Login Corporativo - Código: '{codigo}', Usuario: '{usuario}'")
     def login_corp(self, codigo: str, usuario: str, passw: str):
-        self.page.get_by_role("button", name="Usuario Corporativo").click()
+        self._cerrar_modal_error_conexion()
+        campo_codigo = self.page.get_by_placeholder("Ingresar Código")
+        if campo_codigo.count() == 0 or not campo_codigo.first.is_visible():
+            try:
+                self.page.locator("a[href='/login-corporate']").click(timeout=5000)
+            except Exception:
+                self.page.get_by_role("button", name="Usuario Corporativo").click(timeout=10000)
+            self._cerrar_modal_error_conexion()
+
+        test_ids_por_pais = {
+            "guatemala": "pw-login-option-country-gt",
+            "honduras": "pw-login-option-country-hn",
+            "el salvador": "pw-login-option-country-sv",
+        }
+        country_test_id = test_ids_por_pais.get(self.pais_actual.strip().lower())
+        pais_login_corp = self.page.locator(f"[data-testid='{country_test_id}']") if country_test_id else self.page.locator("not-found")
+        if pais_login_corp.count() > 0 and pais_login_corp.first.is_visible():
+            pais_login_corp.first.click(timeout=10000)
+            self._cerrar_modal_error_conexion()
+
+        campo_codigo = self.page.get_by_placeholder("Ingresar Código")
+        if campo_codigo.count() == 0 or not campo_codigo.first.is_visible():
+            self.page.get_by_role("button", name="Usuario Corporativo").click(timeout=10000)
+            self._cerrar_modal_error_conexion()
+            campo_codigo = self.page.get_by_placeholder("Ingresar Código")
+        expect(campo_codigo).to_be_visible(timeout=30000)
+        campo_codigo.click()
+        campo_codigo.fill(codigo)
         
-        self.page.get_by_placeholder("Ingresar Código").click()
-        self.page.get_by_placeholder("Ingresar Código").fill(codigo)
-        
-        self.page.get_by_role("textbox", name="Ingresar Usuario").click()
-        self.page.get_by_role("textbox", name="Ingresar Usuario").fill(usuario)
-        
-        self.page.get_by_role("textbox", name="Ingresar Contraseña").click()
-        self.page.get_by_role("textbox", name="Ingresar Contraseña").fill(passw)
+        self._fill_app_input("[data-testid='pw-logincorporate-input-username']", usuario)
+        self._fill_app_input("[data-testid='pw-logincorporate-input-password']", passw)
         
         self.page.get_by_role("button", name="Iniciar sesión").click()
         self.page.wait_for_url(f"**/historico", wait_until="networkidle")
         self._take_screenshot("login_corp_success")
+
+    def _fill_app_input(self, selector: str, value: str):
+        campo = self.page.locator(selector).first
+        expect(campo).to_be_visible(timeout=30000)
+        input_interno = campo.locator("input").first
+        try:
+            if input_interno.count() > 0:
+                input_interno.click(timeout=5000)
+                input_interno.fill(value, timeout=5000)
+                return
+        except Exception:
+            pass
+
+        campo.click()
+        self.page.keyboard.press("Control+A")
+        self.page.keyboard.type(value)
+
+    def _cerrar_modal_error_conexion(self):
+        try:
+            modal_error = self.page.get_by_role("dialog", name=re.compile(r"Error de Conexi[oó]n", re.IGNORECASE))
+            if modal_error.count() > 0 and modal_error.first.is_visible():
+                modal_error.get_by_role("button", name="Aceptar").click(timeout=5000)
+                self.page.wait_for_timeout(1000)
+        except Exception:
+            pass
 
     @allure.step("Login Express Center - Estación: '{estacion}', Correo: '{correo}'")
     def login_exec(self, estacion: str, correo: str, passw: str):
@@ -1214,6 +1311,260 @@ class ForzaPage:
                 self._take_screenshot("corp_guide_created")
         else:
             print("No se encontró el heading con la guía.")
+
+    @allure.step("Crear guía CORPORATIVO - Servicio de devolución")
+    def crear_guia_devolucion_corp(self, datos):
+        self.page.locator("label").filter(has_text="¿Es una devolución?").click()
+        try:
+            expect(self.page.get_by_text("El servicio será una devolución")).to_be_visible(timeout=5000)
+        except Exception:
+            self.page.locator("ion-toggle").first.click()
+            expect(self.page.get_by_text("El servicio será una devolución")).to_be_visible(timeout=30000)
+
+        self._seleccionar_destino_devolucion(datos)
+        self.page.get_by_role("button", name=re.compile(r"Calcular", re.IGNORECASE)).click()
+        self._seleccionar_servicio_devolucion(datos.tipo_guia)
+
+        expect(self.page.get_by_text("Remitente", exact=True)).to_be_visible(timeout=30000)
+        if self._es_destino_manual(datos.destino):
+            self.page.get_by_placeholder("Ingresar nombre de contacto").first.fill(datos.nombre_contacto)
+            self.page.get_by_placeholder("Ingresar teléfono").first.fill(datos.telefono)
+            self.page.get_by_role("textbox", name="Ingresar dirección en remitente").fill(datos.direccion_remitente)
+
+        self._seleccionar_tipo_entrega(datos.tipo_entrega)
+        self.page.get_by_role("button", name=re.compile(r"Siguiente", re.IGNORECASE)).click()
+
+        expect(self.page.get_by_text("Cobro de Servicio")).to_be_visible(timeout=30000)
+        self._seleccionar_tipo_cobro(datos.tipo_cobro)
+        self.page.get_by_role("button", name=re.compile(r"Mostrar Resumen", re.IGNORECASE)).click()
+
+        self.page.wait_for_function("() => /No\\. Guía:\\s*FD\\d+/.test(document.body.innerText)", timeout=60000)
+        resumen = self.page.locator("body").inner_text()
+        match = re.search(r"No\.\s*Guía:\s*(FD\d+)", resumen)
+        if not match:
+            raise AssertionError("No se encontró el número de guía de devolución en el resumen.")
+
+        self.guia_generada = match.group(1)
+        self._validar_resumen_devolucion(datos, resumen)
+
+        pais = self._normalizar_nombre_archivo(datos.pais)
+        destino = self._normalizar_nombre_archivo(datos.destino)
+        servicio = "COD" if "cod" in datos.tipo_guia.lower() else "STD"
+        cobro = self._normalizar_nombre_archivo(datos.tipo_cobro)
+        self.guardar_guia_en_archivo(f"guias_Corp_Devolucion_{pais}_{destino}_{servicio}_{cobro}", f"{servicio} Devolucion {datos.tipo_cobro}", self.guia_generada)
+        print(f"Guía de devolución encontrada: {self.guia_generada}")
+        self._take_screenshot("corp_return_guide_created")
+
+    def _seleccionar_destino_devolucion(self, datos):
+        destino = datos.destino.strip().lower()
+        if self._es_destino_manual(datos.destino):
+            self._seleccionar_opcion_destino("Manual")
+            self._seleccionar_poblado_devolucion(datos.poblado)
+            return
+
+        if "cartera" in destino:
+            self._seleccionar_opcion_destino("Cartera de Clientes")
+        elif "exc" in destino or "express center" in destino or "libreta" in destino:
+            self._seleccionar_opcion_destino("Libreta Express Center")
+        else:
+            raise AssertionError(f"Destino de devolución no soportado: {datos.destino}")
+
+        if datos.referencia_destino:
+            self._seleccionar_referencia_destino(datos.referencia_destino)
+
+    def _seleccionar_referencia_destino(self, referencia_destino: str):
+        expect(self.page.get_by_text(referencia_destino).first).to_be_visible(timeout=30000)
+        contenedores = [
+            "ion-card",
+            "ion-item",
+            "ion-row",
+            ".card",
+            ".container",
+        ]
+
+        for selector in contenedores:
+            contenedor = self.page.locator(selector).filter(has_text=re.compile(re.escape(referencia_destino), re.IGNORECASE))
+            if contenedor.count() == 0:
+                continue
+
+            objetivos = []
+            radio = contenedor.first.locator("ion-radio")
+            if radio.count() > 0:
+                objetivos.append(radio.first)
+            boton_interno = contenedor.first.locator("button")
+            if boton_interno.count() > 0:
+                objetivos.append(boton_interno.first)
+            objetivos.append(contenedor.first)
+
+            for objetivo in objetivos:
+                try:
+                    objetivo.click(timeout=5000)
+                    if self._esperar_modal_seleccion_cerrado():
+                        return
+                except Exception:
+                    continue
+
+        self.page.get_by_text(referencia_destino).first.click(timeout=10000)
+        if not self._esperar_modal_seleccion_cerrado():
+            raise AssertionError(f"No se pudo confirmar la selección del destino: {referencia_destino}")
+
+    def _esperar_modal_seleccion_cerrado(self) -> bool:
+        try:
+            expect(self.page.locator("ion-modal.show-modal")).not_to_be_visible(timeout=10000)
+            return True
+        except Exception:
+            return False
+
+    def _seleccionar_poblado_devolucion(self, poblado: str):
+        campo_poblado = self.page.get_by_role("textbox", name="Selecciona un poblado")
+        campo_poblado.click()
+        candidatos = [
+            poblado,
+            self._quitar_acentos(poblado),
+            poblado.split(",", 1)[0],
+            self._quitar_acentos(poblado.split(",", 1)[0]),
+        ]
+
+        for candidato in candidatos:
+            try:
+                campo_poblado.fill(candidato, timeout=5000)
+            except Exception:
+                pass
+
+            try:
+                self.page.get_by_role("heading", name=candidato).click(timeout=5000)
+                return
+            except Exception:
+                pass
+
+            try:
+                self.page.locator("role=heading").filter(has_text=re.compile(re.escape(candidato), re.IGNORECASE)).first.click(timeout=5000)
+                return
+            except Exception:
+                continue
+
+        raise AssertionError(f"No se pudo seleccionar el poblado de devolución: {poblado}")
+
+    def _seleccionar_opcion_destino(self, opcion: str):
+        try:
+            self.page.get_by_role("radio", name=re.compile(opcion, re.IGNORECASE)).click(timeout=5000)
+            return
+        except Exception:
+            pass
+
+        try:
+            self.page.get_by_text(opcion, exact=True).click(timeout=10000)
+        except Exception:
+            self.page.locator("ion-radio").filter(has_text=re.compile(opcion, re.IGNORECASE)).click(timeout=10000)
+
+    def _seleccionar_servicio_devolucion(self, tipo_guia: str):
+        servicio = "Servicio C.O.D." if "cod" in tipo_guia.lower() else "Servicio Estándar"
+        card = self.page.locator("div.card").filter(has_text=servicio)
+        card.get_by_role("button", name="Seleccionar").click()
+
+    def _seleccionar_tipo_entrega(self, tipo_entrega: str):
+        try:
+            self.page.get_by_role("radio", name=re.compile(tipo_entrega, re.IGNORECASE)).click(timeout=5000)
+        except Exception:
+            indice = 1 if "oficina" in tipo_entrega.lower() else 0
+            self.page.locator("ion-radio:visible").nth(indice).click(timeout=10000)
+
+    def _seleccionar_tipo_cobro(self, tipo_cobro: str):
+        if "collect" not in tipo_cobro.lower():
+            return
+
+        try:
+            self.page.locator("ion-col").filter(has_text=re.compile(r"^Crédito$")).locator("label").click(timeout=5000)
+        except Exception:
+            pass
+
+        try:
+            self.page.locator("ion-col").filter(has_text=re.compile(r"^Collect$")).locator("label").click(timeout=10000)
+        except Exception:
+            self.page.get_by_text("Collect", exact=True).click(timeout=10000)
+
+    def _validar_resumen_devolucion(self, datos, resumen: str):
+        valores_esperados = [self.guia_generada]
+        if self._es_destino_manual(datos.destino):
+            valores_esperados.extend([datos.nombre_contacto, datos.telefono, datos.direccion_remitente])
+        elif datos.referencia_destino:
+            valores_esperados.append(datos.referencia_destino)
+
+        for valor in valores_esperados:
+            if valor and valor not in resumen:
+                raise AssertionError(f"El resumen de devolución no contiene el dato esperado: {valor}")
+
+    def _es_destino_manual(self, destino: str) -> bool:
+        return "manual" in destino.strip().lower()
+
+    def _normalizar_nombre_archivo(self, value: str) -> str:
+        value = value.strip().lower()
+        value = self._quitar_acentos(value)
+        return re.sub(r"[^a-z0-9]+", "_", value).strip("_")
+
+    def _quitar_acentos(self, value: str) -> str:
+        reemplazos = {
+            "á": "a",
+            "é": "e",
+            "í": "i",
+            "ó": "o",
+            "ú": "u",
+            "ñ": "n",
+        }
+        for origen, destino in reemplazos.items():
+            value = value.replace(origen, destino)
+            value = value.replace(origen.upper(), destino.upper())
+        return value
+
+    @allure.step("Validar guía de devolución en Mis Envíos")
+    def validar_guia_devolucion_en_mis_envios(self):
+        if not self.guia_generada:
+            raise AssertionError("No hay una guía de devolución guardada para validar.")
+
+        self._ir_a_mis_envios_corporativo()
+        guia = self.page.get_by_text(self.guia_generada, exact=True).first
+        try:
+            expect(guia).to_be_visible(timeout=120000)
+        except Exception:
+            self.page.reload(wait_until="networkidle", timeout=120000)
+            expect(guia).to_be_visible(timeout=120000)
+        self._take_screenshot("corp_return_guide_in_my_shipments")
+
+    def _ir_a_mis_envios_corporativo(self):
+        patron_mis_envios = re.compile(r"MIS ENV[IÍ]OS|Mis Env[ií]os", re.IGNORECASE)
+        opciones = [
+            self.page.get_by_role("button", name=patron_mis_envios).first,
+            self.page.get_by_role("link", name=patron_mis_envios).first,
+            self.page.get_by_text(patron_mis_envios).first,
+        ]
+
+        for opcion in opciones:
+            try:
+                if opcion.count() == 0:
+                    continue
+                opcion.click(timeout=10000)
+                self.page.wait_for_load_state("networkidle", timeout=30000)
+                return
+            except Exception:
+                continue
+
+        self._navegar_a_historico_corporativo()
+
+    def _navegar_a_historico_corporativo(self):
+        match = re.match(r"^(https?://[^/]+)", self.page.url or self.url_actual)
+        if not match:
+            raise AssertionError("No se pudo resolver la URL base para abrir Mis Envíos.")
+
+        base_url = match.group(1)
+        for ruta in ("/express/historico", "/historico"):
+            try:
+                self.page.goto(f"{base_url}{ruta}", wait_until="networkidle", timeout=120000)
+                if "historico" in self.page.url:
+                    return
+            except Exception:
+                continue
+
+        raise AssertionError("No se pudo abrir Mis Envíos para validar la guía generada.")
 
     @allure.step("Crear guías EXEC")
     def crear_guias_exec(self, datos):

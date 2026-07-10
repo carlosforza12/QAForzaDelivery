@@ -1,0 +1,9 @@
+{
+  "GuideSerie": "{{GuideSerie}}",
+  "GuideNumber": {{GuideNumber}},
+  "ManifestNumber": "{{ManifestNumber}}",
+  "Message": "{{Message}}",
+  "Latitude": "{{Latitude}}",
+  "Longitude": "{{Longitude}}",
+  "ReceiverPhone": "{{ReceiverPhone}}"
+}
