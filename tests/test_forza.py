@@ -41,6 +41,10 @@ def step_seleccionar_pais(forza_page: ForzaPage, pais: str):
     else:
         forza_page.select_country(pais)
 
+@given(parsers.parse('usuario selecciona el pais "{pais}"'))
+def step_seleccionar_pais_sin_articulo(forza_page: ForzaPage, pais: str):
+    step_seleccionar_pais(forza_page, pais)
+
 @given(parsers.parse('el entorno es "{entorno}"'))
 def step_set_entorno(forza_page: ForzaPage, entorno: str):
     forza_page.entorno = entorno
@@ -87,6 +91,51 @@ def step_iniciar_creacion_guias_corp(forza_page: ForzaPage, direccion: Direccion
 @given(parsers.parse('el usuario ingresa la estacion "{estacion}" el correo "{correo}" y su pass "{contrasenia}"'))
 def step_login_exec(forza_page: ForzaPage, estacion: str, correo: str, contrasenia: str):
     forza_page.login_exec(estacion, correo, contrasenia)
+
+@given(parsers.parse('usuario ingresa la estacion "{estacion}" el correo "{correo}" y su pass "{contrasenia}"'))
+def step_login_exec_sin_articulo(forza_page: ForzaPage, estacion: str, correo: str, contrasenia: str):
+    step_login_exec(forza_page, estacion, correo, contrasenia)
+
+@given('usuario selecciona la opcion Servicios')
+def step_opcion_servicios_exec(forza_page: ForzaPage):
+    forza_page.opcion_servicios_exec()
+
+@then('el usuario visualiza el modulo de Servicios')
+def step_visualiza_modulo_servicios(forza_page: ForzaPage):
+    forza_page.verificar_modulo_servicios_exec()
+
+@given(parsers.parse('el usuario elige la opcion "{opcion}"'))
+@then(parsers.parse('el usuario elige la opcion "{opcion}"'))
+def step_elegir_opcion_servicio(forza_page: ForzaPage, opcion: str):
+    forza_page.seleccionar_opcion_servicio_exec(opcion)
+
+@given(parsers.parse('el usuario ingresa la guia "{guia}" en "{nombre_textbox}"'))
+@then(parsers.parse('el usuario ingresa la guia "{guia}" en "{nombre_textbox}"'))
+def step_ingresar_guia_recepcion(forza_page: ForzaPage, guia: str, nombre_textbox: str):
+    forza_page.ingresar_guia_recepcion_exec(nombre_textbox, guia)
+
+@given(parsers.parse('el usuario hace click en el boton "{nombre_boton}"'))
+@then(parsers.parse('el usuario hace click en el boton "{nombre_boton}"'))
+def step_click_boton_por_nombre(forza_page: ForzaPage, nombre_boton: str):
+    forza_page.click_boton_exec(nombre_boton)
+
+@given(parsers.parse('el usuario ingresa el nombre de cliente "{nombre_cliente}"'))
+@then(parsers.parse('el usuario ingresa el nombre de cliente "{nombre_cliente}"'))
+def step_ingresar_nombre_cliente(forza_page: ForzaPage, nombre_cliente: str):
+    forza_page.ingresar_nombre_cliente_exec(nombre_cliente)
+
+@given(parsers.parse('el usuario ingresa el DPI "{dpi}"'))
+@then(parsers.parse('el usuario ingresa el DPI "{dpi}"'))
+def step_ingresar_dpi(forza_page: ForzaPage, dpi: str):
+    forza_page.ingresar_dpi_exec(dpi)
+
+@then(parsers.parse('el usuario verifica el link "{nombre_link}"'))
+def step_verificar_link_devolucion(forza_page: ForzaPage, nombre_link: str):
+    forza_page.verificar_link_devolucion_exec(nombre_link)
+
+@then('el usuario verifica Recepcion Exitosa')
+def step_verificar_recepcion_exitosa(forza_page: ForzaPage):
+    forza_page.verificar_link_devolucion_exec("chevron forward Servicio Devolución")
 
 @then('el usuario inicia el proceso de creacion de guias en EXEC')
 def step_iniciar_creacion_guias_exec(forza_page: ForzaPage, direccion: Direccion):

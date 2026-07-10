@@ -184,6 +184,169 @@ class ForzaPage:
         self.page.wait_for_timeout(1000)
         self._take_screenshot("create_guides_section")
 
+    @allure.step("Seleccionar opción Servicios en EXEC")
+    def opcion_servicios_exec(self):
+        candidates = [
+            self.page.get_by_role("link", name=re.compile(r"^Servicios$", re.I)),
+            self.page.get_by_role("button", name=re.compile(r"^Servicios$", re.I)),
+            self.page.get_by_role("menuitem", name=re.compile(r"^Servicios$", re.I)),
+            self.page.get_by_text("Servicios", exact=True),
+            self.page.get_by_text("Servicios", exact=False),
+        ]
+
+        for locator in candidates:
+            try:
+                if locator.count() > 0:
+                    locator.first.click(timeout=10000)
+                    self.page.wait_for_load_state("networkidle", timeout=20000)
+                    self._take_screenshot("servicios_selected_exec")
+                    return
+            except Exception:
+                continue
+
+        raise AssertionError("No se pudo seleccionar la opción 'Servicios' en EXEC")
+
+    @allure.step("Verificar módulo Servicios en EXEC")
+    def verificar_modulo_servicios_exec(self):
+        validaciones = [
+            self.page.get_by_role("searchbox", name="search text"),
+            self.page.get_by_text("No se encontraron servicios", exact=False),
+            self.page.get_by_text("Servicios", exact=False),
+        ]
+
+        for locator in validaciones:
+            try:
+                if locator.count() > 0 and locator.first.is_visible(timeout=10000):
+                    self._take_screenshot("servicios_module_exec")
+                    return
+            except Exception:
+                continue
+
+        current_url = self.page.url.lower()
+        if "serv" in current_url:
+            self._take_screenshot("servicios_module_exec_url")
+            return
+
+        raise AssertionError("No se validó la carga del módulo de Servicios en EXEC")
+
+    @allure.step("Seleccionar opción de servicio en EXEC: '{opcion}'")
+    def seleccionar_opcion_servicio_exec(self, opcion: str):
+        options = [
+            self.page.get_by_role("link", name=opcion),
+            self.page.get_by_role("button", name=opcion),
+            self.page.get_by_text(opcion, exact=True),
+            self.page.get_by_text(opcion, exact=False),
+        ]
+
+        for locator in options:
+            try:
+                if locator.count() > 0:
+                    locator.first.click(timeout=10000)
+                    self.page.wait_for_load_state("networkidle", timeout=20000)
+                    self._take_screenshot("servicio_recepcion_selected")
+                    return
+            except Exception:
+                continue
+
+        raise AssertionError(f"No se encontró la opción de servicio '{opcion}'")
+
+    @allure.step("Ingresar guía en recepción EXEC")
+    def ingresar_guia_recepcion_exec(self, nombre_textbox: str, guia: str):
+        textbox = self.page.get_by_role("textbox", name=nombre_textbox)
+        if textbox.count() == 0:
+            textbox = self.page.get_by_placeholder(nombre_textbox)
+        if textbox.count() == 0:
+            textbox = self.page.locator(
+                "input[placeholder*='guía' i], input[placeholder*='guia' i], "
+                "input[placeholder*='referencia' i], textarea[placeholder*='guía' i], "
+                "textarea[placeholder*='referencia' i]"
+            )
+        if textbox.count() == 0:
+            textbox = self.page.locator(
+                "input[aria-label*='guía' i], input[aria-label*='guia' i], "
+                "input[aria-label*='referencia' i], input[name*='guia' i], "
+                "input[name*='referencia' i], input[id*='guia' i], input[id*='referencia' i]"
+            )
+        if textbox.count() == 0:
+            textbox = self.page.locator("input, textarea")
+        if textbox.count() == 0:
+            raise AssertionError(f"No se encontró el textbox '{nombre_textbox}'")
+
+        textbox.first.wait_for(state="visible", timeout=10000)
+        textbox.first.fill(guia, timeout=10000)
+        self._take_screenshot("guia_recepcion_ingresada")
+
+    @allure.step("Click en botón EXEC: '{nombre_boton}'")
+    def click_boton_exec(self, nombre_boton: str):
+        if nombre_boton.strip().lower() == "agregar":
+            boton = self.page.get_by_role("button", name=re.compile(r"^Agregar$", re.I))
+            if boton.count() == 0:
+                boton = self.page.get_by_text("Agregar", exact=True)
+        elif nombre_boton.strip().lower() == "finalizar":
+            boton = self.page.get_by_role("button", name=re.compile(r"checkmark\s*circle\s*outline", re.I))
+            if boton.count() == 0:
+                boton = self.page.get_by_text(re.compile(r"checkmark\s*circle\s*outline", re.I))
+        else:
+            boton = self.page.get_by_role("button", name=re.compile(re.escape(nombre_boton), re.I))
+            if boton.count() == 0:
+                boton = self.page.get_by_text(nombre_boton, exact=False)
+
+        if boton.count() == 0:
+            raise AssertionError(f"No se encontró el botón '{nombre_boton}'")
+
+        boton.first.click(timeout=10000)
+        self.page.wait_for_timeout(800)
+        self._take_screenshot(f"boton_{re.sub(r'[^a-z0-9]', '_', nombre_boton.lower())}_clicked")
+
+    @allure.step("Ingresar nombre de cliente en EXEC")
+    def ingresar_nombre_cliente_exec(self, nombre_cliente: str):
+        textbox = self.page.get_by_role("textbox", name="Nombre de cliente")
+        if textbox.count() == 0:
+            textbox = self.page.get_by_placeholder("Nombre de cliente")
+        if textbox.count() == 0:
+            textbox = self.page.locator(
+                "input[placeholder*='cliente' i], textarea[placeholder*='cliente' i], "
+                "input[aria-label*='cliente' i], input[name*='cliente' i], input[id*='cliente' i]"
+            )
+        if textbox.count() == 0:
+            textbox = self.page.locator("input[type='text'], textarea")
+        if textbox.count() == 0:
+            raise AssertionError("No se encontró el textbox 'Nombre de cliente'")
+
+        textbox.first.wait_for(state="visible", timeout=10000)
+        textbox.first.fill(nombre_cliente, timeout=10000)
+        self._take_screenshot("nombre_cliente_ingresado")
+
+    @allure.step("Ingresar DPI en EXEC")
+    def ingresar_dpi_exec(self, dpi: str):
+        textbox = self.page.get_by_role("textbox", name="DPI")
+        if textbox.count() == 0:
+            textbox = self.page.get_by_placeholder("DPI")
+        if textbox.count() == 0:
+            textbox = self.page.locator(
+                "input[placeholder*='dpi' i], input[aria-label*='dpi' i], "
+                "input[name*='dpi' i], input[id*='dpi' i]"
+            )
+        if textbox.count() == 0:
+            textbox = self.page.locator("input[type='number'], input[type='text']")
+        if textbox.count() == 0:
+            raise AssertionError("No se encontró el textbox 'DPI'")
+
+        textbox.first.wait_for(state="visible", timeout=10000)
+        textbox.first.fill(dpi, timeout=10000)
+        self._take_screenshot("dpi_ingresado")
+
+    @allure.step("Verificar link de devolución en EXEC")
+    def verificar_link_devolucion_exec(self, nombre_link: str):
+        link = self.page.get_by_role("link", name=nombre_link)
+        if link.count() == 0:
+            link = self.page.get_by_text(nombre_link, exact=False)
+        if link.count() == 0:
+            raise AssertionError(f"No se encontró el link '{nombre_link}'")
+
+        expect(link.first).to_be_visible(timeout=10000)
+        self._take_screenshot("link_servicio_devolucion_visible")
+
     # ==============================================================================
     # FLUJO PRINCIPAL: CREACIÓN DE GUÍAS
     # ==============================================================================
