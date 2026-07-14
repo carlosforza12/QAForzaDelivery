@@ -14,7 +14,8 @@ Cómo ejecutar:
 """
 
 import pytest
-from pytest_bdd import scenarios, given, parsers
+from pytest_bdd import scenarios, given, when, parsers
+from pages.forza_page import ForzaPage
 
 import allure
 
@@ -24,6 +25,7 @@ from api.request_builder import (
     execute_proof_of_delivery,
     execute_tracking_publico,
     execute_intercept_and_return,
+    execute_zigi_payment_link,
 )
 
 # Cargar todos los escenarios de los features API
@@ -32,6 +34,7 @@ scenarios("../features/ordenes_recoleccion_api.feature")
 scenarios("../features/proof_of_delivery_api.feature")
 scenarios("../features/tracking_publico_api.feature")
 scenarios("../features/intercept_and_return_api.feature")
+scenarios("../features/zigi_payment_api.feature")
 
 
 def _scenario_name(request) -> str:
@@ -389,3 +392,97 @@ def step_ejecutar_intercept_and_return(datatable, api_context: dict, request) ->
         )
 
     api_context["intercept_and_return"] = result
+
+
+# ==============================================================================
+# ZIGI PAYMENT LINK
+# ==============================================================================
+
+@given("El usuario genera un link de pago Zigi API")
+def step_generar_link_zigi(datatable, api_context: dict, request) -> None:
+    """
+    Flujo encadenado: obtiene Token del courier y luego crea un link de pago Zigi.
+
+    Columnas requeridas en la tabla:
+        requestCourier, requestZigi, metodoCourier, metodoZigi,
+        staging, CodApp, SecretKey,
+        Phone, IdCountry, GuideSerie, GuideNumber,
+        Amount, CollectValue, CODValue, GeneratedMethod, PaymentId
+
+    Columnas opcionales:
+        MensajeEsperado
+    """
+    headers = [cell for cell in datatable[0]]
+    values  = [cell for cell in datatable[1]]
+    params  = dict(zip(headers, values))
+
+    scenario_name = _scenario_name(request)
+
+    template_courier = params["requestCourier"]
+    template_zigi    = params["requestZigi"]
+    method_courier   = params["metodoCourier"]
+    method_zigi      = params["metodoZigi"]
+    staging          = params["staging"]
+    cod_app          = params["CodApp"]
+    secret_key       = params["SecretKey"]
+    mensaje_esperado = params.get("MensajeEsperado", "")
+
+    staging_urls = getattr(request.config, "_staging_urls", [])
+    if staging and staging not in staging_urls:
+        staging_urls.append(staging)
+
+    skip_keys = {"requestCourier", "requestZigi", "metodoCourier", "metodoZigi",
+                 "staging", "CodApp", "SecretKey", "MensajeEsperado",
+                 "ejecutarStaging", "Escenario"}
+    template_params = {k: v for k, v in params.items() if k not in skip_keys}
+
+    with allure.step(f"Zigi Payment Link — {method_courier} → {method_zigi}"):
+        result = execute_zigi_payment_link(
+            template_courier=template_courier,
+            template_zigi=template_zigi,
+            method_courier=method_courier,
+            method_zigi=method_zigi,
+            staging=staging,
+            cod_app=cod_app,
+            secret_key=secret_key,
+            scenario_name=scenario_name,
+            mensaje_esperado=mensaje_esperado,
+            **template_params,
+        )
+
+    api_context["zigi_payment"] = result
+
+
+@when("El usuario completa el pago en Zigi")
+def step_completar_pago_zigi(datatable, api_context: dict, forza_page: ForzaPage) -> None:
+    """
+    Completa el formulario de pago en la página de Paggo usando el link
+    generado en el paso anterior (api_context["zigi_payment"]["link"]).
+
+    Columnas requeridas en la tabla:
+        Nombre, Apellido, Email, PhonePago, Tarjeta, Vencimiento,
+        CVV, DPI, Departamento, Direccion
+    """
+    headers = [cell for cell in datatable[0]]
+    values  = [cell for cell in datatable[1]]
+    params  = dict(zip(headers, values))
+
+    link = api_context["zigi_payment"]["link"]
+    assert link, "No se obtuvo un link de pago del paso anterior"
+
+    with allure.step(f"Completando pago en Paggo — {link}"):
+        download = forza_page.completar_pago_zigi(
+            link=link,
+            nombre=params["Nombre"],
+            apellido=params["Apellido"],
+            email=params["Email"],
+            telefono=params["PhonePago"],
+            tarjeta=params["Tarjeta"],
+            vencimiento=params["Vencimiento"],
+            cvv=params["CVV"],
+            dpi=params["DPI"],
+            departamento=params["Departamento"],
+            direccion=params["Direccion"],
+        )
+
+    api_context["zigi_payment"]["pago_completado"] = True

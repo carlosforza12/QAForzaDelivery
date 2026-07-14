@@ -86,3 +86,12 @@ Feature: Creacion de Guias Guatemala API
       | Escenario | request                           | metodo                        | AmmountCashOnDelivery | cantidad | CountPieces | staging                           | Collected | CodApp                    | SecretKey                        | IdCustomer | CodeOfReference |
       | collet    | plantilla_COD_API_HN_Poblado.json | GetServiceByHeaderCodeRequest | valor                 | 1        | 1           | https://apicore.forzadelivery.io/ | false     | SICPXSAPIECOM250620241123 | sTMQdkrMTQxNGc3jo3795qvZvht8uRrf | 91726      | 1514554         |
 
+  @creacion_STD_Collet_QA
+  Scenario Outline: Creacion de guias STD QA
+    Given El usuario selecciona el request API con los siguientes datos
+      | request   | metodo   | AmmountCashOnDelivery   | cantidad   | CountPieces   | staging   | CodApp   | SecretKey   | Collected   | IdCustomer   | CodeOfReference   |
+      | <request> | <metodo> | <AmmountCashOnDelivery> | <cantidad> | <CountPieces> | <staging> | <CodApp> | <SecretKey> | <Collected> | <IdCustomer> | <CodeOfReference> |
+
+    Examples:
+      | Escenario  | request                   | metodo                        | AmmountCashOnDelivery | cantidad | CountPieces | staging                                      | Collected | CodApp                   | SecretKey                        | IdCustomer | CodeOfReference |
+      | STD collet | plantilla_STD_API_GT.json | GetServiceByHeaderCodeRequest | valor                 | 4        | 1           | https://qa-apicore.forzadeliveryexpress.com/ | true      | SIFDCAPIECOM230920201910 | SHyKQDB3K6dfHxR3Dbqw45CQMv65vgkX | 117707     | 2733324         |

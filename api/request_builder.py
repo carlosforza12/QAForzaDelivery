@@ -896,6 +896,180 @@ def execute_tracking_publico(
 
 
 # ---------------------------------------------------------------------------
+# Zigi Payment Link (CourierApp → ZigiPayment)
+# ---------------------------------------------------------------------------
+
+def execute_zigi_payment_link(
+    template_courier: str,
+    template_zigi: str,
+    method_courier: str,
+    method_zigi: str,
+    staging: str,
+    cod_app: str,
+    secret_key: str,
+    scenario_name: str = "zigi_payment",
+    mensaje_esperado: str = "",
+    **params,
+) -> dict:
+    """
+    Flujo encadenado para generar un link de pago Zigi.
+
+    Paso 1: CourierApp/GetCourierInfoWithoutTokenLog
+        Obtiene el Token del courier a partir de Phone + IdCountry.
+
+    Paso 2: ZigiPayment/ValidateLinkZigi
+        Usa el Token obtenido para crear el link de pago.
+
+    Args:
+        template_courier:  Template JSON para el paso 1 (plantilla_courier_info.json)
+        template_zigi:     Template JSON para el paso 2 (plantilla_validate_link_zigi.json)
+        method_courier:    Método API paso 1 (GetCourierInfoWithoutTokenLog)
+        method_zigi:       Método API paso 2 (ValidateLinkZigi)
+        staging:           URL base del ambiente
+        cod_app:           Código de la app cliente
+        secret_key:        Clave HMAC
+        scenario_name:     Nombre del escenario para logs/archivos
+        mensaje_esperado:  Mensaje esperado en el paso 2 (ObjectValue.Message)
+        **params:          Placeholders para ambos templates
+                           (Phone, IdCountry, GuideSerie, GuideNumber, Amount,
+                            CollectValue, CODValue, GeneratedMethod, PaymentId)
+
+    Returns:
+        Dict con { token, courier_name, link, phone, amount, symbol,
+                   receiver_name, response_courier, response_zigi }
+    """
+    scenario_name = _sanitize_name(scenario_name)
+
+    # ── Paso 1: Obtener Token del courier ────────────────────────────────
+    courier_str = load_template(template_courier)
+    courier_payload = replace_placeholders(courier_str, params)
+
+    with allure.step(f"Paso 1 — Obtener Token del courier ({method_courier})"):
+        _log_transaction("Request", template_courier, json.dumps(courier_payload, indent=2, ensure_ascii=False), scenario_name)
+
+        try:
+            resp_courier = APIClient.send_data_to_forza_api(
+                "CourierApp", method_courier, courier_payload, staging, cod_app, secret_key
+            )
+        except Exception as exc:
+            error_msg = f"Error al obtener info del courier:\n  Detalle: {exc}"
+            _log_transaction("ERROR", template_courier, error_msg, scenario_name)
+            raise AssertionError(error_msg) from exc
+
+        _log_transaction("Response", template_courier, json.dumps(resp_courier, indent=2, ensure_ascii=False), scenario_name)
+
+        assert resp_courier is not None, "La respuesta de CourierApp fue nula"
+        assert resp_courier.get("StatusCode") == 200, (
+            f"StatusCode inesperado en CourierApp: {resp_courier.get('StatusCode')} "
+            f"— {resp_courier.get('Description')}"
+        )
+        obj_courier = resp_courier.get("ObjectValue")
+        assert obj_courier and len(obj_courier) > 0, "ObjectValue vacío en respuesta de CourierApp"
+
+        token = obj_courier[0].get("Token", "")
+        courier_name = f"{obj_courier[0].get('FirstName', '')} {obj_courier[0].get('LastName', '')}".strip()
+
+        assert token, "El Token del courier vino vacío"
+
+        print(f"  ✔ Token obtenido: {token[:12]}...")
+        print(f"    Courier: {courier_name}")
+
+        allure.attach(
+            f"Token: {token}\nCourier: {courier_name}\nRoute: {obj_courier[0].get('Route', '')}",
+            name="Courier Info",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    # ── Paso 2: Crear link de pago Zigi ──────────────────────────────────
+    params["Token"] = token
+    zigi_str = load_template(template_zigi)
+    zigi_payload = replace_placeholders(zigi_str, params)
+
+    with allure.step(f"Paso 2 — Crear link de pago Zigi ({method_zigi})"):
+        _log_transaction("Request", template_zigi, json.dumps(zigi_payload, indent=2, ensure_ascii=False), scenario_name)
+
+        try:
+            resp_zigi = APIClient.send_data_to_forza_api(
+                "ZigiPayment", method_zigi, zigi_payload, staging, cod_app, secret_key
+            )
+        except Exception as exc:
+            error_msg = f"Error al crear link de pago Zigi:\n  Detalle: {exc}"
+            _log_transaction("ERROR", template_zigi, error_msg, scenario_name)
+            raise AssertionError(error_msg) from exc
+
+        _log_transaction("Response", template_zigi, json.dumps(resp_zigi, indent=2, ensure_ascii=False), scenario_name)
+
+        assert resp_zigi is not None, "La respuesta de ZigiPayment fue nula"
+        assert resp_zigi.get("StatusCode") == 200, (
+            f"StatusCode inesperado en ZigiPayment: {resp_zigi.get('StatusCode')} "
+            f"— {resp_zigi.get('Description')}"
+        )
+
+        obj_zigi = resp_zigi.get("ObjectValue") or {}
+        assert obj_zigi, "ObjectValue vacío en respuesta de ZigiPayment"
+
+        link           = obj_zigi.get("Link", "")
+        phone          = obj_zigi.get("Phone", "")
+        amount         = obj_zigi.get("Amount")
+        symbol         = obj_zigi.get("Symbol", "")
+        receiver_first = obj_zigi.get("ReceiverFirstName", "")
+        receiver_last  = obj_zigi.get("ReceiverLastName", "")
+        receiver_name  = f"{receiver_first} {receiver_last}".strip()
+        message        = obj_zigi.get("Message", "")
+        id_result      = obj_zigi.get("IdResult")
+
+        if mensaje_esperado:
+            opciones = [m.strip() for m in mensaje_esperado.split("|")]
+            actual = (message or "").strip()
+            assert actual in opciones, (
+                f"Mensaje inesperado en ZigiPayment.\n"
+                f"  Esperado (cualquiera): {opciones}\n"
+                f"  Recibido: '{actual}'"
+            )
+
+        assert link, "El Link de pago vino vacío en la respuesta de ZigiPayment"
+
+        print(f"  ✔ Link de pago creado: {link}")
+        print(f"    Destinatario: {receiver_name}")
+        print(f"    Monto: {symbol}{amount}")
+        print(f"    Teléfono: {phone}")
+
+        allure.attach(
+            (
+                f"Link      : {link}\n"
+                f"IdResult  : {id_result}\n"
+                f"Message   : {message}\n"
+                f"Receiver  : {receiver_name}\n"
+                f"Amount    : {symbol}{amount}\n"
+                f"Phone     : {phone}\n"
+                f"GuideSerie: {obj_zigi.get('GuideSerie', '')}\n"
+                f"GuideNumber: {obj_zigi.get('GuideNumber', '')}"
+            ),
+            name="Zigi Payment Link",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    # Guardar el link en archivo de resultados
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    clean = scenario_name.replace(" ", "_")
+    _append_txt(RESULTS_DIR / f"{clean}_links.txt", f"{link} ---> Guía: {params.get('GuideSerie','')}{params.get('GuideNumber','')}")
+
+    return {
+        "token": token,
+        "courier_name": courier_name,
+        "link": link,
+        "phone": phone,
+        "amount": amount,
+        "symbol": symbol,
+        "receiver_name": receiver_name,
+        "id_result": id_result,
+        "message": message,
+        "response_courier": resp_courier,
+        "response_zigi": resp_zigi,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Intercept And Return
 # ---------------------------------------------------------------------------
 

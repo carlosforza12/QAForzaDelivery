@@ -1,6 +1,7 @@
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import unicodedata
 from pathlib import Path
@@ -11,9 +12,27 @@ from pages.forza_page import ForzaPage
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--allure-history",
+        action="store_true",
+        default=False,
+        help="Mantener historial de ejecuciones anteriores en allure-results. "
+             "Sin este flag, se limpia antes de cada ejecución.",
+    )
+
 
 def pytest_configure(config):
     config._staging_urls = []
+
+    allure_dir = _PROJECT_ROOT / "allure-results"
+    if not config.getoption("--allure-history", default=False):
+        if allure_dir.exists():
+            shutil.rmtree(allure_dir)
+        allure_dir.mkdir(parents=True, exist_ok=True)
 
 
 def _resolve_feature_file(session) -> Path | None:

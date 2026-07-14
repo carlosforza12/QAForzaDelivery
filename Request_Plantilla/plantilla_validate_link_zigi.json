@@ -1,0 +1,10 @@
+{
+  "Token": "{{Token}}",
+  "GuideSerie": "{{GuideSerie}}",
+  "GuideNumber": "{{GuideNumber}}",
+  "Amount": {{Amount}},
+  "CollectValue": {{CollectValue}},
+  "CODValue": {{CODValue}},
+  "GeneratedMethod": "{{GeneratedMethod}}",
+  "PaymentId": {{PaymentId}}
+}

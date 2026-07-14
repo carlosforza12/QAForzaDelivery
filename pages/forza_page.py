@@ -661,6 +661,71 @@ class ForzaPage:
         return "".join(str(random.randint(0, 9)) for _ in range(longitud))
 
     # ==============================================================================
+    # PAGO ZIGI (Paggo)
+    # ==============================================================================
+
+    @allure.step("Completar pago Zigi en link de pago")
+    def completar_pago_zigi(self, link: str, nombre: str, apellido: str, email: str,
+                             telefono: str, tarjeta: str, vencimiento: str, cvv: str,
+                             dpi: str, departamento: str, direccion: str):
+        self.page.goto(link, timeout=120000)
+        self.page.wait_for_load_state("load")
+        self.page.wait_for_timeout(1000)
+        self._take_screenshot("zigi_pagina_pago_cargada")
+
+        self.page.locator('input[name="nombre"]').wait_for(state="visible", timeout=60000)
+        self._take_screenshot("zigi_formulario_visible")
+
+        self.page.locator('input[name="nombre"]').click()
+        self.page.locator('input[name="nombre"]').fill(nombre)
+        self.page.locator('input[name="apellido"]').click()
+        self.page.locator('input[name="apellido"]').fill(apellido)
+        self.page.locator('input[name="email-field"]').click()
+        self.page.locator('input[name="email-field"]').fill(email)
+        self.page.locator('input[name="phone-field"]').click()
+        self.page.locator('input[name="phone-field"]').fill(telefono)
+        self._take_screenshot("zigi_datos_personales")
+        self.page.wait_for_timeout(1000)
+
+        self.page.locator('input[autocomplete="cc-number"]').click()
+        self.page.locator('input[autocomplete="cc-number"]').fill(tarjeta)
+        self.page.locator('input[autocomplete="cc-exp"]').click()
+        self.page.locator('input[autocomplete="cc-exp"]').fill(vencimiento)
+        self.page.locator('input[placeholder="123"]').click()
+        self.page.locator('input[placeholder="123"]').fill(cvv)
+        self._take_screenshot("zigi_datos_tarjeta")
+        self.page.wait_for_timeout(1000)
+
+        self.page.get_by_role("textbox", name="Ingrese su DPI o NIT").click()
+        self.page.get_by_role("textbox", name="Ingrese su DPI o NIT").fill(dpi)
+        self.page.get_by_role("button", name="Departamento*").first.click()
+        self.page.get_by_role("option", name=departamento).click()
+        self.page.wait_for_timeout(500)
+        self.page.get_by_role("button", name=f"Departamento* {departamento}").nth(1).click()
+        self.page.get_by_role("option", name=departamento).click()
+        self.page.locator('input[name="direccionUno"]').click()
+        self.page.locator('input[name="direccionUno"]').fill(direccion)
+        self._take_screenshot("zigi_datos_facturacion")
+        self.page.wait_for_timeout(1000)
+
+        self.page.route("https://www.google.com/**", lambda route: route.abort())
+
+        self.page.locator('[data-test-id="btn-loading-button"]').dblclick()
+
+        self.page.get_by_text("Transaccion exitosa").wait_for(state="visible", timeout=60000)
+        self._take_screenshot("zigi_transaccion_exitosa")
+
+        self.page.get_by_text("Pago realizado exitosamente").wait_for(state="visible", timeout=10000)
+        self._take_screenshot("zigi_comprobante_pago")
+
+        print(f"  ✔ Pago Zigi completado — Transacción exitosa")
+        allure.attach(
+            f"Link: {link}\nNombre: {nombre} {apellido}\nResultado: Transaccion exitosa",
+            name="Pago Zigi Completado",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    # ==============================================================================
     # FLUJOS CORPORATIVOS Y EXEC
     # ==============================================================================
 
