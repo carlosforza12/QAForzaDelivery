@@ -109,9 +109,47 @@ ATLASSIAN_EMAIL=email@dominio.com
 ATLASSIAN_API_TOKEN=tu_token
 CONFLUENCE_SPACE_KEY=ESPACIO
 CONFLUENCE_PARENT_PAGE_ID=123456
+DEVOLUCION_GT_CORP_CODIGO=tu_codigo_corporativo_gt
+DEVOLUCION_GT_CORP_USUARIO=tu_usuario_corporativo_gt
+DEVOLUCION_GT_CORP_CONTRASENIA=tu_contrasenia_corporativa_gt
+DEVOLUCION_GT_NOMBRE_CONTACTO=nombre_para_devolucion_gt
+DEVOLUCION_GT_TELEFONO=telefono_para_devolucion_gt
+DEVOLUCION_GT_DIRECCION_REMITENTE=direccion_para_devolucion_gt
+DEVOLUCION_HN_CORP_CODIGO=tu_codigo_corporativo_hn
+DEVOLUCION_HN_CORP_USUARIO=tu_usuario_corporativo_hn
+DEVOLUCION_HN_CORP_CONTRASENIA=tu_contrasenia_corporativa_hn
+DEVOLUCION_HN_NOMBRE_CONTACTO=nombre_para_devolucion_hn
+DEVOLUCION_HN_TELEFONO=telefono_para_devolucion_hn
+DEVOLUCION_HN_DIRECCION_REMITENTE=direccion_para_devolucion_hn
+DEVOLUCION_SV_CORP_CODIGO=tu_codigo_corporativo_sv
+DEVOLUCION_SV_CORP_USUARIO=tu_usuario_corporativo_sv
+DEVOLUCION_SV_CORP_CONTRASENIA=tu_contrasenia_corporativa_sv
+DEVOLUCION_SV_NOMBRE_CONTACTO=nombre_para_devolucion_sv
+DEVOLUCION_SV_TELEFONO=telefono_para_devolucion_sv
+DEVOLUCION_SV_DIRECCION_REMITENTE=direccion_para_devolucion_sv
 ```
 
 `OPENROUTER_API_KEY` es opcional. Si no está configurado, se omite la generación de documentos ejecutivos con IA.
+
+Ejecutar solo el flujo de servicio de devolución corporativo:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -m servicio_devolucion_corporativo -s
+```
+
+Ejecutar el flujo de servicio de devolución por país:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -m devolucion_gt -s
+.\.venv\Scripts\python.exe -m pytest -m devolucion_hn -s
+.\.venv\Scripts\python.exe -m pytest -m devolucion_sv -s
+```
+
+Ejecutar un caso específico de la matriz:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -m servicio_devolucion_corporativo -k gt_manual_estandar_casa_credito -s
+```
 
 ### Allure CLI
 

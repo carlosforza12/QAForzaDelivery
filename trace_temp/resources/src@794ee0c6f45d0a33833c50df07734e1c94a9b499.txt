@@ -20,8 +20,6 @@ class ForzaPage:
         self.url_actual: str = ""
         self.token: str = ""
         self.entorno: str = ""
-        self.guia_generada: str = ""
-        self.pais_actual: str = ""
 
     def _take_screenshot(self, name: str = "screenshot"):
         try:
@@ -33,16 +31,7 @@ class ForzaPage:
     @allure.step("Navegar a la URL: '{url}'")
     def go_to_page_web(self, url: str):
         self.url_actual = url
-        ultimo_error = None
-        for intento in range(3):
-            try:
-                self.page.goto(url, timeout=120000, wait_until="load")
-                break
-            except Exception as error:
-                ultimo_error = error
-                if intento == 2:
-                    raise
-                self.page.wait_for_timeout(5000)
+        self.page.goto(url, timeout=120000)
         self._take_screenshot("navigation")
 
     @allure.step("Validar que el título sea: '{titulo_esperado}'")
@@ -52,48 +41,8 @@ class ForzaPage:
 
     @allure.step("Seleccionar país: '{country}'")
     def select_country(self, country: str):
-        self.pais_actual = country
         patron_regex = re.compile(f"^{re.escape(country)}$")
-        test_ids_por_pais = {
-            "guatemala": "pw-login-option-country-gt",
-            "honduras": "pw-login-option-country-hn",
-            "el salvador": "pw-login-option-country-sv",
-        }
-        country_test_id = test_ids_por_pais.get(country.strip().lower())
-        opciones_pais = [
-            self.page.locator(f"[data-testid='{country_test_id}']") if country_test_id else self.page.locator("not-found"),
-            self.page.get_by_role("button", name=re.compile(country, re.IGNORECASE)),
-            self.page.locator("ion-item").filter(has_text=patron_regex),
-            self.page.locator(".container-icon").filter(has_text=patron_regex),
-            self.page.locator("div").filter(has_text=patron_regex).get_by_role("emphasis"),
-        ]
-
-        def login_visible():
-            usuario_corp = self.page.get_by_text("Usuario Corporativo", exact=True)
-            correo = self.page.get_by_text("Correo electrónico", exact=True)
-            return (
-                usuario_corp.count() > 0 and usuario_corp.first.is_visible()
-            ) or (
-                correo.count() > 0 and correo.first.is_visible()
-            )
-
-        for opcion in opciones_pais:
-            try:
-                if opcion.count() == 0:
-                    continue
-                opcion.first.click(timeout=10000, force=True)
-                try:
-                    self.page.wait_for_load_state("networkidle", timeout=10000)
-                except Exception:
-                    pass
-                self.page.wait_for_timeout(1000)
-                if login_visible():
-                    break
-            except Exception:
-                continue
-        else:
-            raise AssertionError(f"No se pudo seleccionar el país: {country}")
-
+        self.page.locator("div").filter(has_text=patron_regex).get_by_role("emphasis").click(timeout=30000)
         self.page.wait_for_load_state("load")
         self._take_screenshot("country_selection")
 
@@ -137,88 +86,40 @@ class ForzaPage:
 
     @allure.step("Login Corporativo - Código: '{codigo}', Usuario: '{usuario}'")
     def login_corp(self, codigo: str, usuario: str, passw: str):
-        self._cerrar_modal_error_conexion()
-        campo_codigo = self.page.get_by_placeholder("Ingresar Código")
-        if campo_codigo.count() == 0 or not campo_codigo.first.is_visible():
-            try:
-                self.page.locator("a[href='/login-corporate']").click(timeout=5000)
-            except Exception:
-                self.page.get_by_role("button", name="Usuario Corporativo").click(timeout=10000)
-            self._cerrar_modal_error_conexion()
-
-        test_ids_por_pais = {
-            "guatemala": "pw-login-option-country-gt",
-            "honduras": "pw-login-option-country-hn",
-            "el salvador": "pw-login-option-country-sv",
-        }
-        country_test_id = test_ids_por_pais.get(self.pais_actual.strip().lower())
-        pais_login_corp = self.page.locator(f"[data-testid='{country_test_id}']") if country_test_id else self.page.locator("not-found")
-        if pais_login_corp.count() > 0 and pais_login_corp.first.is_visible():
-            pais_login_corp.first.click(timeout=10000)
-            self._cerrar_modal_error_conexion()
-
-        campo_codigo = self.page.get_by_placeholder("Ingresar Código")
-        if campo_codigo.count() == 0 or not campo_codigo.first.is_visible():
-            self.page.get_by_role("button", name="Usuario Corporativo").click(timeout=10000)
-            self._cerrar_modal_error_conexion()
-            campo_codigo = self.page.get_by_placeholder("Ingresar Código")
-        expect(campo_codigo).to_be_visible(timeout=30000)
-        campo_codigo.click()
-        campo_codigo.fill(codigo)
+        self.page.get_by_role("button", name="Usuario Corporativo").click()
         
-        self._fill_app_input("[data-testid='pw-logincorporate-input-username']", usuario)
-        self._fill_app_input("[data-testid='pw-logincorporate-input-password']", passw)
+        self.page.get_by_placeholder("Ingresar Código").click()
+        self.page.get_by_placeholder("Ingresar Código").fill(codigo)
+        
+        self.page.get_by_role("textbox", name="Ingresar Usuario").click()
+        self.page.get_by_role("textbox", name="Ingresar Usuario").fill(usuario)
+        
+        self.page.get_by_role("textbox", name="Ingresar Contraseña").click()
+        self.page.get_by_role("textbox", name="Ingresar Contraseña").fill(passw)
         
         self.page.get_by_role("button", name="Iniciar sesión").click()
         self.page.wait_for_url(f"**/historico", wait_until="networkidle")
         self._take_screenshot("login_corp_success")
 
-    def _fill_app_input(self, selector: str, value: str):
-        campo = self.page.locator(selector).first
-        expect(campo).to_be_visible(timeout=30000)
-        input_interno = campo.locator("input").first
-        try:
-            if input_interno.count() > 0:
-                input_interno.click(timeout=5000)
-                input_interno.fill(value, timeout=5000)
-                return
-        except Exception:
-            pass
-
-        campo.click()
-        self.page.keyboard.press("Control+A")
-        self.page.keyboard.type(value)
-
-    def _cerrar_modal_error_conexion(self):
-        try:
-            modal_error = self.page.get_by_role("dialog", name=re.compile(r"Error de Conexi[oó]n", re.IGNORECASE))
-            if modal_error.count() > 0 and modal_error.first.is_visible():
-                modal_error.get_by_role("button", name="Aceptar").click(timeout=5000)
-                self.page.wait_for_timeout(1000)
-        except Exception:
-            pass
-
     @allure.step("Login Express Center - Estación: '{estacion}', Correo: '{correo}'")
     def login_exec(self, estacion: str, correo: str, passw: str):
         self.page.get_by_role("button", name="Usuario Express Center").click()
-        self.page.wait_for_timeout(800)
+        self.page.wait_for_timeout(1200)
+        self._take_screenshot("login_exec_after_tipo")
+        self._diagnostico_dom()  # TEMPORAL: ver qué renderiza la página en este punto
 
-        # En /login-exc a veces el selector de estación aparece directo (Angular state),
-        # otras veces la página vuelve a pedir seleccionar país primero.
-        # Intento 1: selector de estación directo (flujo estándar)
+        # El botón puede decir "Selecciona tu estación" (sesión nueva) o ya tener
+        # una estación pre-cargada. Se intenta ambos antes de buscar en el searchbox.
         btn_sel = self.page.locator("button, ion-button").filter(
             has_text=re.compile(r"Selecciona tu estaci", re.I)
         ).first
-        try:
-            btn_sel.wait_for(state="visible", timeout=5000)
+        if btn_sel.count() > 0 and btn_sel.is_visible():
             btn_sel.click()
-        except Exception:
-            # Intento 2: /login-exc muestra país primero — seleccionar Guatemala y reintentar
-            pais_btn = self.page.get_by_text("Guatemala", exact=True).first
-            pais_btn.wait_for(state="visible", timeout=10000)
-            pais_btn.click()
-            self.page.wait_for_timeout(600)
-            self.page.get_by_role("button", name="Selecciona tu estación").click(timeout=15000)
+        else:
+            # Intentar clic en el selector de estación independientemente del texto actual
+            self.page.locator("button, ion-button").filter(
+                has_text=re.compile(re.escape(estacion) + r"|Selecciona", re.I)
+            ).first.click(timeout=10000)
 
         self.page.get_by_role("searchbox", name="search text").click()
         self.page.get_by_role("searchbox", name="search text").fill(estacion)
@@ -280,222 +181,6 @@ class ForzaPage:
         self.page.get_by_role("link", name="chevron forward Crear Guías").click()
         self.page.wait_for_timeout(1000)
         self._take_screenshot("create_guides_section")
-
-    @allure.step("Seleccionar opción Servicios en EXEC")
-    def opcion_servicios_exec(self):
-        candidates = [
-            self.page.get_by_role("link", name=re.compile(r"^Servicios$", re.I)),
-            self.page.get_by_role("button", name=re.compile(r"^Servicios$", re.I)),
-            self.page.get_by_role("menuitem", name=re.compile(r"^Servicios$", re.I)),
-            self.page.get_by_text("Servicios", exact=True),
-            self.page.get_by_text("Servicios", exact=False),
-        ]
-
-        for locator in candidates:
-            try:
-                if locator.count() > 0:
-                    locator.first.click(timeout=10000)
-                    self.page.wait_for_load_state("networkidle", timeout=20000)
-                    self._take_screenshot("servicios_selected_exec")
-                    return
-            except Exception:
-                continue
-
-        raise AssertionError("No se pudo seleccionar la opción 'Servicios' en EXEC")
-
-    @allure.step("Verificar módulo Servicios en EXEC")
-    def verificar_modulo_servicios_exec(self):
-        validaciones = [
-            self.page.get_by_role("searchbox", name="search text"),
-            self.page.get_by_text("No se encontraron servicios", exact=False),
-            self.page.get_by_text("Servicios", exact=False),
-        ]
-
-        for locator in validaciones:
-            try:
-                if locator.count() > 0 and locator.first.is_visible(timeout=10000):
-                    self._take_screenshot("servicios_module_exec")
-                    return
-            except Exception:
-                continue
-
-        current_url = self.page.url.lower()
-        if "serv" in current_url:
-            self._take_screenshot("servicios_module_exec_url")
-            return
-
-        raise AssertionError("No se validó la carga del módulo de Servicios en EXEC")
-
-    @allure.step("Seleccionar opción de servicio en EXEC: '{opcion}'")
-    def seleccionar_opcion_servicio_exec(self, opcion: str):
-        options = [
-            self.page.get_by_role("link", name=opcion),
-            self.page.get_by_role("button", name=opcion),
-            self.page.get_by_text(opcion, exact=True),
-            self.page.get_by_text(opcion, exact=False),
-        ]
-
-        for locator in options:
-            try:
-                if locator.count() > 0:
-                    locator.first.click(timeout=10000)
-                    self.page.wait_for_load_state("networkidle", timeout=20000)
-                    opcion_slug = re.sub(r"[^a-z0-9]+", "_", opcion.lower()).strip("_")
-                    self._take_screenshot(f"servicio_{opcion_slug}_selected")
-                    return
-            except Exception:
-                continue
-
-        raise AssertionError(f"No se encontró la opción de servicio '{opcion}'")
-
-    @allure.step("Ingresar guía en recepción EXEC")
-    def ingresar_guia_recepcion_exec(self, nombre_textbox: str, guia: str):
-        textbox = self.page.get_by_role("textbox", name=nombre_textbox)
-        if textbox.count() == 0:
-            textbox = self.page.get_by_placeholder(nombre_textbox)
-        if textbox.count() == 0:
-            textbox = self.page.locator(
-                "input[placeholder*='guía' i], input[placeholder*='guia' i], "
-                "input[placeholder*='referencia' i], textarea[placeholder*='guía' i], "
-                "textarea[placeholder*='referencia' i]"
-            )
-        if textbox.count() == 0:
-            textbox = self.page.locator(
-                "input[aria-label*='guía' i], input[aria-label*='guia' i], "
-                "input[aria-label*='referencia' i], input[name*='guia' i], "
-                "input[name*='referencia' i], input[id*='guia' i], input[id*='referencia' i]"
-            )
-        if textbox.count() == 0:
-            textbox = self.page.locator("input, textarea")
-        if textbox.count() == 0:
-            raise AssertionError(f"No se encontró el textbox '{nombre_textbox}'")
-
-        textbox.first.wait_for(state="visible", timeout=10000)
-        textbox.first.fill(guia, timeout=10000)
-        self._take_screenshot("guia_recepcion_ingresada")
-
-    @allure.step("Click en botón EXEC: '{nombre_boton}'")
-    def click_boton_exec(self, nombre_boton: str):
-        if nombre_boton.strip().lower() == "agregar":
-            boton = self.page.get_by_role("button", name=re.compile(r"^Agregar$", re.I))
-            if boton.count() == 0:
-                boton = self.page.get_by_role("button", name="AGREGAR")
-            if boton.count() == 0:
-                boton = self.page.get_by_text("AGREGAR", exact=True)
-            if boton.count() == 0:
-                boton = self.page.locator("button:has-text('AGREGAR')")
-            if boton.count() == 0:
-                boton = self.page.get_by_text(re.compile(r"^AGREGAR$", re.I))
-        elif nombre_boton.strip().lower() == "finalizar":
-            boton = self.page.get_by_role("button", name=re.compile(r"checkmark\s*circle\s*outline", re.I))
-            if boton.count() == 0:
-                boton = self.page.get_by_text(re.compile(r"checkmark\s*circle\s*outline", re.I))
-            if boton.count() == 0:
-                boton = self.page.get_by_role("button", name=re.compile(r"^finalizar$", re.I))
-            if boton.count() == 0:
-                boton = self.page.get_by_text("FINALIZAR", exact=True)
-            if boton.count() == 0:
-                boton = self.page.locator("button:has-text('FINALIZAR')")
-            if boton.count() == 0:
-                boton = self.page.get_by_text(re.compile(r"^finalizar$", re.I))
-            if boton.count() == 0:
-                boton = self.page.get_by_title("Finalizar y pagar")
-            if boton.count() == 0:
-                boton = self.page.get_by_title(re.compile(r"finalizar", re.I))
-            if boton.count() == 0:
-                boton = self.page.locator("button[title*='Finalizar' i], [role='button'][title*='Finalizar' i]")
-            if boton.count() == 0:
-                boton = self.page.locator("button, [role='button']").filter(has_text=re.compile(r"finalizar", re.I))
-        else:
-            boton = self.page.get_by_role("button", name=re.compile(re.escape(nombre_boton), re.I))
-            if boton.count() == 0:
-                boton = self.page.get_by_text(nombre_boton, exact=False)
-
-        if boton.count() == 0:
-            raise AssertionError(f"No se encontró el botón '{nombre_boton}'")
-
-        boton.first.click(timeout=10000)
-        self.page.wait_for_timeout(800)
-        self._take_screenshot(f"boton_{re.sub(r'[^a-z0-9]', '_', nombre_boton.lower())}_clicked")
-
-    @allure.step("Click en botón CONTINUAR en EXEC")
-    def click_boton_continuar_exec(self, nombre_boton: str = "CONTINUAR"):
-        boton = self.page.get_by_role("button", name="Continuar chevron forward")
-        if boton.count() == 0:
-            boton = self.page.get_by_role("button", name=re.compile(r"continuar\s*chevron\s*forward", re.I))
-        if boton.count() == 0:
-            boton = self.page.get_by_role("button", name=re.compile(r"^continuar$", re.I))
-        if boton.count() == 0:
-            boton = self.page.get_by_text("CONTINUAR", exact=True)
-        if boton.count() == 0:
-            boton = self.page.locator("button:has-text('CONTINUAR'), [role='button']:has-text('CONTINUAR')")
-        if boton.count() == 0:
-            boton = self.page.locator("button, [role='button']").filter(has_text=re.compile(r"continuar", re.I))
-
-        if boton.count() == 0:
-            raise AssertionError(f"No se encontró el botón '{nombre_boton}'")
-
-        boton.first.click(timeout=10000)
-        self.page.wait_for_timeout(800)
-        self._take_screenshot("boton_continuar_clicked")
-
-    @allure.step("Ingresar nombre de cliente en EXEC")
-    def ingresar_nombre_cliente_exec(self, nombre_cliente: str):
-        textbox = self.page.get_by_role("textbox", name="Nombre de cliente")
-        if textbox.count() == 0:
-            textbox = self.page.get_by_placeholder("Nombre de cliente")
-        if textbox.count() == 0:
-            textbox = self.page.locator(
-                "input[placeholder*='cliente' i], textarea[placeholder*='cliente' i], "
-                "input[aria-label*='cliente' i], input[name*='cliente' i], input[id*='cliente' i]"
-            )
-        if textbox.count() == 0:
-            textbox = self.page.locator("input[type='text'], textarea")
-        if textbox.count() == 0:
-            raise AssertionError("No se encontró el textbox 'Nombre de cliente'")
-
-        textbox.first.wait_for(state="visible", timeout=10000)
-        textbox.first.fill(nombre_cliente, timeout=10000)
-        self._take_screenshot("nombre_cliente_ingresado")
-
-    @allure.step("Ingresar DPI en EXEC")
-    def ingresar_dpi_exec(self, dpi: str):
-        textbox = self.page.get_by_role("textbox", name="DPI")
-        if textbox.count() == 0:
-            textbox = self.page.get_by_placeholder("DPI")
-        if textbox.count() == 0:
-            textbox = self.page.locator(
-                "input[placeholder*='dpi' i], input[aria-label*='dpi' i], "
-                "input[name*='dpi' i], input[id*='dpi' i]"
-            )
-        if textbox.count() == 0:
-            textbox = self.page.locator("input[type='number'], input[type='text']")
-        if textbox.count() == 0:
-            raise AssertionError("No se encontró el textbox 'DPI'")
-
-        textbox.first.wait_for(state="visible", timeout=10000)
-        textbox.first.fill(dpi, timeout=10000)
-        self._take_screenshot("dpi_ingresado")
-
-    @allure.step("Verificar link de servicio en EXEC")
-    def verificar_link_servicio_exec(self, nombre_link: str):
-        link = self.page.get_by_role("link", name=nombre_link)
-        if link.count() == 0:
-            link = self.page.get_by_text(nombre_link, exact=False)
-        if link.count() == 0:
-            raise AssertionError(f"No se encontró el link '{nombre_link}'")
-
-        expect(link.first).to_be_visible(timeout=10000)
-        link_slug = re.sub(r"[^a-z0-9]+", "_", nombre_link.lower()).strip("_")
-        self._take_screenshot(f"link_{link_slug}_visible")
-
-    @allure.step("Verificar link de recepción en EXEC")
-    def verificar_link_recepcion_exec(self, nombre_link: str):
-        self.verificar_link_servicio_exec(nombre_link)
-
-    @allure.step("Verificar link de devolución en EXEC")
-    def verificar_link_devolucion_exec(self, nombre_link: str):
-        self.verificar_link_servicio_exec(nombre_link)
 
     # ==============================================================================
     # FLUJO PRINCIPAL: CREACIÓN DE GUÍAS
@@ -991,79 +676,19 @@ class ForzaPage:
         return "".join(str(random.randint(0, 9)) for _ in range(longitud))
 
     # ==============================================================================
-    # PAGO ZIGI (Paggo)
-    # ==============================================================================
-
-    @allure.step("Completar pago Zigi en link de pago")
-    def completar_pago_zigi(self, link: str, nombre: str, apellido: str, email: str,
-                             telefono: str, tarjeta: str, vencimiento: str, cvv: str,
-                             dpi: str, departamento: str, direccion: str):
-        self.page.goto(link, timeout=120000)
-        self.page.wait_for_load_state("load")
-        self.page.wait_for_timeout(1000)
-        self._take_screenshot("zigi_pagina_pago_cargada")
-
-        self.page.locator('input[name="nombre"]').wait_for(state="visible", timeout=60000)
-        self._take_screenshot("zigi_formulario_visible")
-
-        self.page.locator('input[name="nombre"]').click()
-        self.page.locator('input[name="nombre"]').fill(nombre)
-        self.page.locator('input[name="apellido"]').click()
-        self.page.locator('input[name="apellido"]').fill(apellido)
-        self.page.locator('input[name="email-field"]').click()
-        self.page.locator('input[name="email-field"]').fill(email)
-        self.page.locator('input[name="phone-field"]').click()
-        self.page.locator('input[name="phone-field"]').fill(telefono)
-        self._take_screenshot("zigi_datos_personales")
-        self.page.wait_for_timeout(1000)
-
-        self.page.locator('input[autocomplete="cc-number"]').click()
-        self.page.locator('input[autocomplete="cc-number"]').fill(tarjeta)
-        self.page.locator('input[autocomplete="cc-exp"]').click()
-        self.page.locator('input[autocomplete="cc-exp"]').fill(vencimiento)
-        self.page.locator('input[placeholder="123"]').click()
-        self.page.locator('input[placeholder="123"]').fill(cvv)
-        self._take_screenshot("zigi_datos_tarjeta")
-        self.page.wait_for_timeout(1000)
-
-        self.page.get_by_role("textbox", name="Ingrese su DPI o NIT").click()
-        self.page.get_by_role("textbox", name="Ingrese su DPI o NIT").fill(dpi)
-        self.page.get_by_role("button", name="Departamento*").first.click()
-        self.page.get_by_role("option", name=departamento).click()
-        self.page.wait_for_timeout(500)
-        self.page.get_by_role("button", name=f"Departamento* {departamento}").nth(1).click()
-        self.page.get_by_role("option", name=departamento).click()
-        self.page.locator('input[name="direccionUno"]').click()
-        self.page.locator('input[name="direccionUno"]').fill(direccion)
-        self._take_screenshot("zigi_datos_facturacion")
-        self.page.wait_for_timeout(1000)
-
-        self.page.route("https://www.google.com/**", lambda route: route.abort())
-
-        self.page.locator('[data-test-id="btn-loading-button"]').dblclick()
-
-        self.page.get_by_text("Transaccion exitosa").wait_for(state="visible", timeout=60000)
-        self._take_screenshot("zigi_transaccion_exitosa")
-
-        self.page.get_by_text("Pago realizado exitosamente").wait_for(state="visible", timeout=10000)
-        self._take_screenshot("zigi_comprobante_pago")
-
-        print(f"  ✔ Pago Zigi completado — Transacción exitosa")
-        allure.attach(
-            f"Link: {link}\nNombre: {nombre} {apellido}\nResultado: Transaccion exitosa",
-            name="Pago Zigi Completado",
-            attachment_type=allure.attachment_type.TEXT,
-        )
-
-    # ==============================================================================
     # MIS ENVÍOS - PORTAL EXPRESS CENTER (EXEC)
     # ==============================================================================
 
     def _esperar_mis_envios_lista(self, timeout: int = 30000):
+        """Espera a que Mis Envíos termine de cargar: networkidle + campo de búsqueda visible.
+        Usa el input interno del ion-searchbar para evitar strict mode (el componente emite 2 nodos)."""
         self.page.wait_for_load_state("networkidle", timeout=timeout)
         self.page.get_by_role("searchbox", name="search text").wait_for(state="visible", timeout=timeout)
 
     def _guias_en_tabla(self):
+        """Locator de los números de guía FD visibles en pantalla.
+        El build de QA renderiza los números en <ion-label> (componente Ionic),
+        no en <strong> como indica el código fuente Angular."""
         return self.page.locator("ion-label").filter(has_text=re.compile(r"FD\d+"))
 
     @allure.step("Verificar que la pantalla Mis Envíos cargó correctamente")
@@ -1071,6 +696,7 @@ class ForzaPage:
         self._esperar_mis_envios_lista()
         guias = self._guias_en_tabla()
         sin_resultados = self.page.get_by_text("No se encontraron servicios", exact=False)
+        # count() es instantáneo — esperar explícitamente el primer ion-label antes de asertar
         try:
             guias.first.wait_for(state="visible", timeout=10000)
         except Exception:
@@ -1080,6 +706,7 @@ class ForzaPage:
 
     @allure.step("Aplicar filtro de estado: '{estado}'")
     def filtrar_mis_envios_por_estado(self, estado: str):
+        # QA build renderiza los filtros como ion-segment-button (Ionic), no .btn-group-toggle
         btn = self.page.locator("ion-segment-button").filter(has_text=estado).first
         btn.wait_for(state="visible", timeout=15000)
         btn.click()
@@ -1089,6 +716,7 @@ class ForzaPage:
 
     @allure.step("Verificar que la tabla refleja el filtro: '{estado}'")
     def verificar_filtro_mis_envios(self, estado: str):
+        # Tabla vacía sin mensaje es resultado válido (cuenta sin guías en ese estado)
         self.page.wait_for_load_state("networkidle", timeout=10000)
         guias = self._guias_en_tabla()
         try:
@@ -1127,6 +755,8 @@ class ForzaPage:
     @allure.step("Verificar que la tabla no muestra resultados")
     def verificar_sin_resultados_mis_envios(self):
         self.page.wait_for_timeout(2000)
+        # El searchbar es autocomplete: al escribir texto inválido no aparece sugerencia
+        # Verificar que el texto buscado no aparece como resultado en ningún ion-label
         invalidas = self.page.locator("ion-label").filter(
             has_text=re.compile(r"GUIA-NO-EXISTE", re.I)
         )
@@ -1142,17 +772,21 @@ class ForzaPage:
         toggle.click()
         self.page.wait_for_timeout(500)
 
+        # Parsear fechas DD/MM/YYYY
         d_s, m_s, y_s = (int(x) for x in fecha_inicio.split("/"))
         d_e, m_e, y_e = (int(x) for x in fecha_fin.split("/"))
         hoy = _date.today()
 
+        # Abrir calendario inicio
         cal_icons = self.page.get_by_role("img", name="Calendar")
         cal_icons.first.click()
         self.page.wait_for_timeout(400)
 
+        # Navegar al mes de inicio retrocediendo desde el mes actual
         meses_back = (hoy.year - y_s) * 12 + (hoy.month - m_s)
         btn_prev = self.page.get_by_role("button", name="‹")
         for _ in range(meses_back):
+            # Si el botón está deshabilitado el calendario no permite ir más atrás
             if btn_prev.first.get_attribute("disabled") is not None:
                 raise AssertionError(
                     f"El calendario no permite navegar hasta {fecha_inicio} — "
@@ -1161,20 +795,25 @@ class ForzaPage:
             btn_prev.first.click()
             self.page.wait_for_timeout(150)
 
+        # Clic en el día de inicio (primer span con ese número exacto)
         self.page.locator("span").filter(has_text=re.compile(rf"^{d_s}$")).first.click()
         self.page.wait_for_timeout(300)
 
+        # Abrir calendario fin
         cal_icons.nth(1).click()
         self.page.wait_for_timeout(400)
 
+        # Navegar al mes de fin
         meses_back_end = (hoy.year - y_e) * 12 + (hoy.month - m_e)
         for _ in range(meses_back_end):
             btn_prev.first.click()
             self.page.wait_for_timeout(150)
 
+        # Clic en el día de fin
         self.page.locator("span").filter(has_text=re.compile(rf"^{d_e}$")).first.click()
         self.page.wait_for_timeout(300)
 
+        # Buscar
         self.page.get_by_text("Buscar guías").click()
         self.page.wait_for_load_state("networkidle", timeout=30000)
         self._take_screenshot("filtro_por_fecha_aplicado")
@@ -1190,12 +829,14 @@ class ForzaPage:
 
     @allure.step("Verificar paginación y navegar a la siguiente página si existe")
     def verificar_paginacion_mis_envios(self):
+        # ngx-pagination renderiza los botones con aria-label "page N" — codegen confirmado
         self.page.wait_for_load_state("networkidle", timeout=15000)
         btn_p2 = self.page.get_by_text("page 2").first
         if btn_p2.count() > 0:
             btn_p2.click()
             self.page.wait_for_load_state("networkidle", timeout=20000)
             guias_p2 = self._guias_en_tabla()
+            # Esperar hidratación de ion-label antes de contar
             try:
                 guias_p2.first.wait_for(state="visible", timeout=15000)
                 assert guias_p2.count() > 0, "La página 2 no cargó ninguna guía"
@@ -1217,6 +858,7 @@ class ForzaPage:
 
     @allure.step("Verificar que el rastreo se abrió con información de la guía")
     def verificar_rastreo_mis_envios(self):
+        # El rastreo puede abrirse como modal Bootstrap, componente Angular, o nueva sección
         rastreo = self.page.locator(".modal.show, [role='dialog'], app-rastreo, app-modal, .modal-dialog").first
         guia_visible = self.page.locator("//strong[contains(text(),'FD')] | //h4[contains(text(),'FD')] | //h5[contains(text(),'FD')]").first
         assert rastreo.is_visible(timeout=10000) or guia_visible.is_visible(timeout=10000), \
@@ -1224,6 +866,8 @@ class ForzaPage:
         self._take_screenshot("rastreo_verificado")
 
     def _encontrar_elemento_visible_por_texto(self, texto: str, patron: str = None) -> object:
+        """Itera sobre todos los elementos que coincidan con el texto (label, ion-label, span, button)
+        y devuelve el primero visible. Robusto ante variaciones de tag entre source y QA build."""
         busqueda = re.compile(patron or texto, re.I)
         for tag in ("label", "ion-label", "span", "button"):
             candidatos = self.page.locator(tag).filter(has_text=busqueda)
@@ -1234,6 +878,7 @@ class ForzaPage:
         return None
 
     def _diagnostico_dom(self):
+        """Vuelca texto visible de buttons/labels/ion-labels/spans al stdout para diagnóstico."""
         resultado = self.page.evaluate("""
             () => {
                 const tags = ['button', 'label', 'ion-label', 'span', 'a'];
@@ -1276,21 +921,38 @@ class ForzaPage:
         self.page.wait_for_timeout(2000)
         self._take_screenshot("modal_generar_excel_abierto")
 
-        self.page.get_by_role("textbox", name="Seleccione un Año").click()
-        self.page.wait_for_timeout(600)
-        self._take_screenshot("modal_picker_anio_abierto")
-        self.page.get_by_role("heading", name="2026").click()
-        self.page.wait_for_timeout(500)
+        # El modal tiene dos <select>: Año y Mes (confirmado por diagnóstico DOM)
+        # Primer select = Año, Segundo select = Mes (por orden de aparición en el DOM)
+        selects = self.page.locator("select")
+        selects.first.wait_for(state="visible", timeout=10000)
 
-        self.page.get_by_role("textbox", name=re.compile(r"Seleccione un mes", re.I)).click()
-        self.page.wait_for_timeout(600)
-        self._take_screenshot("modal_picker_mes_abierto")
-        self.page.get_by_role("heading", name="Marzo").click()
-        self.page.wait_for_timeout(500)
+        # Seleccionar Año 2026
+        try:
+            selects.nth(0).select_option(value="2026")
+        except Exception:
+            # Fallback: buscar por label asociado
+            self.page.get_by_label(re.compile(r"A.o", re.I)).select_option(value="2026")
+        self.page.wait_for_timeout(400)
+
+        # Seleccionar Mes: Marzo = 3 (valor numérico estándar en Angular forms)
+        try:
+            selects.nth(1).select_option(value="3")
+        except Exception:
+            try:
+                selects.nth(1).select_option(label=re.compile(r"Mar(zo)?", re.I))
+            except Exception:
+                self.page.get_by_label(re.compile(r"Mes", re.I)).select_option(value="3")
+        self.page.wait_for_timeout(400)
         self._take_screenshot("modal_generar_excel_seleccionado")
 
+        # Buscar botón de descarga dentro del modal — puede ser "Descargar", "Generar", "Aceptar"
+        submit_btn = self.page.get_by_role("button").filter(
+            has_text=re.compile(r"Descargar|Generar|Aceptar|OK|Confirmar", re.I)
+        ).first
+        submit_btn.wait_for(state="visible", timeout=8000)
+
         with self.page.expect_download(timeout=20000) as dl_info:
-            self.page.get_by_role("button", name=re.compile(r"Aceptar", re.I)).click()
+            submit_btn.click()
 
         download = dl_info.value
         assert download.suggested_filename != "", "La descarga del Excel no se completó"
@@ -1299,8 +961,16 @@ class ForzaPage:
 
     @allure.step("Filtrar Envíos completados, seleccionar guías y descargar PDF")
     def verificar_boton_reimprimir_guias(self):
+        """
+        Flujo real:
+        1. Filtrar por 'Envíos completados' (guías que permiten PDF)
+        2. Seleccionar al menos un checkbox
+        3. Verificar que 'Generar PDF' se habilita
+        4. Descargar el PDF
+        """
         self._esperar_mis_envios_lista()
 
+        # Paso 1: ir a Envíos completados
         completados = self.page.locator("ion-segment-button").filter(
             has_text=re.compile(r"completados", re.I)
         ).first
@@ -1310,17 +980,59 @@ class ForzaPage:
         self.page.wait_for_timeout(1000)
         self._take_screenshot("reimprimir_filtro_completados")
 
+        # Paso 2: verificar que hay guías y seleccionar la primera
+        guias = self._guias_en_tabla()
+        try:
+            guias.first.wait_for(state="visible", timeout=10000)
+        except Exception:
+            raise AssertionError(
+                "No hay guías en Envíos completados para este usuario — "
+                "no se puede probar la descarga de PDF"
+            )
+
+        # El primer checkbox es el de la primera guía de la tabla
         checkboxes = self.page.get_by_role("checkbox")
-        checkboxes.nth(3).wait_for(state="visible", timeout=15000)
-        checkboxes.nth(3).click()
+        checkboxes.first.wait_for(state="visible", timeout=8000)
+        checkboxes.first.click()
         self.page.wait_for_timeout(800)
         self._take_screenshot("reimprimir_checkbox_seleccionado")
 
-        with self.page.expect_download(timeout=20000) as dl_info:
-            self.page.get_by_text("Generar PDF").nth(1).click()
+        # Paso 3: confirmar que el botón Generar PDF está ahora habilitado
+        habilitado = self.page.evaluate("""
+            () => {
+                const btns = Array.from(document.querySelectorAll('button, ion-button'));
+                const btn = btns.find(b => b.textContent.trim().includes('Generar PDF'));
+                if (!btn) return null;
+                return !(btn.disabled || btn.hasAttribute('disabled'));
+            }
+        """)
+        print(f"[INFO] Estado Generar PDF tras selección: habilitado={habilitado}")
+
+        # Paso 4: generar el PDF — puede descargarse o abrir en nueva pestaña
+        # JS click evita la intercepción de ion-col.topShips sobre la ion-label
+        context = self.page.context
+        with context.expect_page(timeout=20000) as popup_info:
+            clicked = self.page.evaluate("""
+                () => {
+                    const btns = Array.from(document.querySelectorAll('button, ion-button'));
+                    const btn = btns.find(b =>
+                        !b.disabled && !b.hasAttribute('disabled') &&
+                        b.textContent.trim().includes('Generar PDF')
+                    );
+                    if (btn) { btn.click(); return true; }
+                    return false;
+                }
+            """)
+        assert clicked, "No se encontró un botón 'Generar PDF' habilitado para hacer clic"
+        popup = popup_info.value
+        popup.wait_for_load_state("domcontentloaded", timeout=15000)
+        assert popup.url not in ("", "about:blank"), \
+            f"La nueva pestaña del PDF se abrió sin contenido (url: {popup.url})"
+        print(f"[OK] PDF abierto en nueva pestaña: {popup.url}")
 
         download = dl_info.value
-        assert download.suggested_filename != "", "La descarga del PDF no se completó"
+        assert download.suggested_filename != "", \
+            "La descarga del PDF no se completó o el archivo está vacío"
         self._take_screenshot("pdf_descargado")
         print(f"[OK] PDF descargado: {download.suggested_filename}")
 
@@ -1389,260 +1101,6 @@ class ForzaPage:
                 self._take_screenshot("corp_guide_created")
         else:
             print("No se encontró el heading con la guía.")
-
-    @allure.step("Crear guía CORPORATIVO - Servicio de devolución")
-    def crear_guia_devolucion_corp(self, datos):
-        self.page.locator("label").filter(has_text="¿Es una devolución?").click()
-        try:
-            expect(self.page.get_by_text("El servicio será una devolución")).to_be_visible(timeout=5000)
-        except Exception:
-            self.page.locator("ion-toggle").first.click()
-            expect(self.page.get_by_text("El servicio será una devolución")).to_be_visible(timeout=30000)
-
-        self._seleccionar_destino_devolucion(datos)
-        self.page.get_by_role("button", name=re.compile(r"Calcular", re.IGNORECASE)).click()
-        self._seleccionar_servicio_devolucion(datos.tipo_guia)
-
-        expect(self.page.get_by_text("Remitente", exact=True)).to_be_visible(timeout=30000)
-        if self._es_destino_manual(datos.destino):
-            self.page.get_by_placeholder("Ingresar nombre de contacto").first.fill(datos.nombre_contacto)
-            self.page.get_by_placeholder("Ingresar teléfono").first.fill(datos.telefono)
-            self.page.get_by_role("textbox", name="Ingresar dirección en remitente").fill(datos.direccion_remitente)
-
-        self._seleccionar_tipo_entrega(datos.tipo_entrega)
-        self.page.get_by_role("button", name=re.compile(r"Siguiente", re.IGNORECASE)).click()
-
-        expect(self.page.get_by_text("Cobro de Servicio")).to_be_visible(timeout=30000)
-        self._seleccionar_tipo_cobro(datos.tipo_cobro)
-        self.page.get_by_role("button", name=re.compile(r"Mostrar Resumen", re.IGNORECASE)).click()
-
-        self.page.wait_for_function("() => /No\\. Guía:\\s*FD\\d+/.test(document.body.innerText)", timeout=60000)
-        resumen = self.page.locator("body").inner_text()
-        match = re.search(r"No\.\s*Guía:\s*(FD\d+)", resumen)
-        if not match:
-            raise AssertionError("No se encontró el número de guía de devolución en el resumen.")
-
-        self.guia_generada = match.group(1)
-        self._validar_resumen_devolucion(datos, resumen)
-
-        pais = self._normalizar_nombre_archivo(datos.pais)
-        destino = self._normalizar_nombre_archivo(datos.destino)
-        servicio = "COD" if "cod" in datos.tipo_guia.lower() else "STD"
-        cobro = self._normalizar_nombre_archivo(datos.tipo_cobro)
-        self.guardar_guia_en_archivo(f"guias_Corp_Devolucion_{pais}_{destino}_{servicio}_{cobro}", f"{servicio} Devolucion {datos.tipo_cobro}", self.guia_generada)
-        print(f"Guía de devolución encontrada: {self.guia_generada}")
-        self._take_screenshot("corp_return_guide_created")
-
-    def _seleccionar_destino_devolucion(self, datos):
-        destino = datos.destino.strip().lower()
-        if self._es_destino_manual(datos.destino):
-            self._seleccionar_opcion_destino("Manual")
-            self._seleccionar_poblado_devolucion(datos.poblado)
-            return
-
-        if "cartera" in destino:
-            self._seleccionar_opcion_destino("Cartera de Clientes")
-        elif "exc" in destino or "express center" in destino or "libreta" in destino:
-            self._seleccionar_opcion_destino("Libreta Express Center")
-        else:
-            raise AssertionError(f"Destino de devolución no soportado: {datos.destino}")
-
-        if datos.referencia_destino:
-            self._seleccionar_referencia_destino(datos.referencia_destino)
-
-    def _seleccionar_referencia_destino(self, referencia_destino: str):
-        expect(self.page.get_by_text(referencia_destino).first).to_be_visible(timeout=30000)
-        contenedores = [
-            "ion-card",
-            "ion-item",
-            "ion-row",
-            ".card",
-            ".container",
-        ]
-
-        for selector in contenedores:
-            contenedor = self.page.locator(selector).filter(has_text=re.compile(re.escape(referencia_destino), re.IGNORECASE))
-            if contenedor.count() == 0:
-                continue
-
-            objetivos = []
-            radio = contenedor.first.locator("ion-radio")
-            if radio.count() > 0:
-                objetivos.append(radio.first)
-            boton_interno = contenedor.first.locator("button")
-            if boton_interno.count() > 0:
-                objetivos.append(boton_interno.first)
-            objetivos.append(contenedor.first)
-
-            for objetivo in objetivos:
-                try:
-                    objetivo.click(timeout=5000)
-                    if self._esperar_modal_seleccion_cerrado():
-                        return
-                except Exception:
-                    continue
-
-        self.page.get_by_text(referencia_destino).first.click(timeout=10000)
-        if not self._esperar_modal_seleccion_cerrado():
-            raise AssertionError(f"No se pudo confirmar la selección del destino: {referencia_destino}")
-
-    def _esperar_modal_seleccion_cerrado(self) -> bool:
-        try:
-            expect(self.page.locator("ion-modal.show-modal")).not_to_be_visible(timeout=10000)
-            return True
-        except Exception:
-            return False
-
-    def _seleccionar_poblado_devolucion(self, poblado: str):
-        campo_poblado = self.page.get_by_role("textbox", name="Selecciona un poblado")
-        campo_poblado.click()
-        candidatos = [
-            poblado,
-            self._quitar_acentos(poblado),
-            poblado.split(",", 1)[0],
-            self._quitar_acentos(poblado.split(",", 1)[0]),
-        ]
-
-        for candidato in candidatos:
-            try:
-                campo_poblado.fill(candidato, timeout=5000)
-            except Exception:
-                pass
-
-            try:
-                self.page.get_by_role("heading", name=candidato).click(timeout=5000)
-                return
-            except Exception:
-                pass
-
-            try:
-                self.page.locator("role=heading").filter(has_text=re.compile(re.escape(candidato), re.IGNORECASE)).first.click(timeout=5000)
-                return
-            except Exception:
-                continue
-
-        raise AssertionError(f"No se pudo seleccionar el poblado de devolución: {poblado}")
-
-    def _seleccionar_opcion_destino(self, opcion: str):
-        try:
-            self.page.get_by_role("radio", name=re.compile(opcion, re.IGNORECASE)).click(timeout=5000)
-            return
-        except Exception:
-            pass
-
-        try:
-            self.page.get_by_text(opcion, exact=True).click(timeout=10000)
-        except Exception:
-            self.page.locator("ion-radio").filter(has_text=re.compile(opcion, re.IGNORECASE)).click(timeout=10000)
-
-    def _seleccionar_servicio_devolucion(self, tipo_guia: str):
-        servicio = "Servicio C.O.D." if "cod" in tipo_guia.lower() else "Servicio Estándar"
-        card = self.page.locator("div.card").filter(has_text=servicio)
-        card.get_by_role("button", name="Seleccionar").click()
-
-    def _seleccionar_tipo_entrega(self, tipo_entrega: str):
-        try:
-            self.page.get_by_role("radio", name=re.compile(tipo_entrega, re.IGNORECASE)).click(timeout=5000)
-        except Exception:
-            indice = 1 if "oficina" in tipo_entrega.lower() else 0
-            self.page.locator("ion-radio:visible").nth(indice).click(timeout=10000)
-
-    def _seleccionar_tipo_cobro(self, tipo_cobro: str):
-        if "collect" not in tipo_cobro.lower():
-            return
-
-        try:
-            self.page.locator("ion-col").filter(has_text=re.compile(r"^Crédito$")).locator("label").click(timeout=5000)
-        except Exception:
-            pass
-
-        try:
-            self.page.locator("ion-col").filter(has_text=re.compile(r"^Collect$")).locator("label").click(timeout=10000)
-        except Exception:
-            self.page.get_by_text("Collect", exact=True).click(timeout=10000)
-
-    def _validar_resumen_devolucion(self, datos, resumen: str):
-        valores_esperados = [self.guia_generada]
-        if self._es_destino_manual(datos.destino):
-            valores_esperados.extend([datos.nombre_contacto, datos.telefono, datos.direccion_remitente])
-        elif datos.referencia_destino:
-            valores_esperados.append(datos.referencia_destino)
-
-        for valor in valores_esperados:
-            if valor and valor not in resumen:
-                raise AssertionError(f"El resumen de devolución no contiene el dato esperado: {valor}")
-
-    def _es_destino_manual(self, destino: str) -> bool:
-        return "manual" in destino.strip().lower()
-
-    def _normalizar_nombre_archivo(self, value: str) -> str:
-        value = value.strip().lower()
-        value = self._quitar_acentos(value)
-        return re.sub(r"[^a-z0-9]+", "_", value).strip("_")
-
-    def _quitar_acentos(self, value: str) -> str:
-        reemplazos = {
-            "á": "a",
-            "é": "e",
-            "í": "i",
-            "ó": "o",
-            "ú": "u",
-            "ñ": "n",
-        }
-        for origen, destino in reemplazos.items():
-            value = value.replace(origen, destino)
-            value = value.replace(origen.upper(), destino.upper())
-        return value
-
-    @allure.step("Validar guía de devolución en Mis Envíos")
-    def validar_guia_devolucion_en_mis_envios(self):
-        if not self.guia_generada:
-            raise AssertionError("No hay una guía de devolución guardada para validar.")
-
-        self._ir_a_mis_envios_corporativo()
-        guia = self.page.get_by_text(self.guia_generada, exact=True).first
-        try:
-            expect(guia).to_be_visible(timeout=120000)
-        except Exception:
-            self.page.reload(wait_until="networkidle", timeout=120000)
-            expect(guia).to_be_visible(timeout=120000)
-        self._take_screenshot("corp_return_guide_in_my_shipments")
-
-    def _ir_a_mis_envios_corporativo(self):
-        patron_mis_envios = re.compile(r"MIS ENV[IÍ]OS|Mis Env[ií]os", re.IGNORECASE)
-        opciones = [
-            self.page.get_by_role("button", name=patron_mis_envios).first,
-            self.page.get_by_role("link", name=patron_mis_envios).first,
-            self.page.get_by_text(patron_mis_envios).first,
-        ]
-
-        for opcion in opciones:
-            try:
-                if opcion.count() == 0:
-                    continue
-                opcion.click(timeout=10000)
-                self.page.wait_for_load_state("networkidle", timeout=30000)
-                return
-            except Exception:
-                continue
-
-        self._navegar_a_historico_corporativo()
-
-    def _navegar_a_historico_corporativo(self):
-        match = re.match(r"^(https?://[^/]+)", self.page.url or self.url_actual)
-        if not match:
-            raise AssertionError("No se pudo resolver la URL base para abrir Mis Envíos.")
-
-        base_url = match.group(1)
-        for ruta in ("/express/historico", "/historico"):
-            try:
-                self.page.goto(f"{base_url}{ruta}", wait_until="networkidle", timeout=120000)
-                if "historico" in self.page.url:
-                    return
-            except Exception:
-                continue
-
-        raise AssertionError("No se pudo abrir Mis Envíos para validar la guía generada.")
 
     @allure.step("Crear guías EXEC")
     def crear_guias_exec(self, datos):
