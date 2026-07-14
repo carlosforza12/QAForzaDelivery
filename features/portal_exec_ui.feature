@@ -32,3 +32,42 @@
       Ejemplos:
       | Escenario       | url                                         | titulo     | pais      | estacion       | correo                            | contrasenia | tipo_guia         | collet |
       | STD-Collet-EXEC | https://qa-portal.forzadeliveryexpress.com/ | Hermes Web | Guatemala | FD EXC JUTIAPA | x_LILIAN.GARCIA@FORZADELIVERY.COM | qaqaqaqa    | Servicio Estándar | true   |
+
+      @recepcion_exc
+      Esquema del escenario:  Recepcion EXC
+      Dado el usuario selecciona la url del portal de forza "<url>" y el titulo de la pagina es "<titulo>"
+      Y usuario selecciona el pais "<pais>"
+      Y usuario ingresa la estacion "<estacion>" el correo "<correo>" y su pass "<contrasenia>"
+      Y usuario selecciona la opcion Servicios
+      Entonces el usuario visualiza el modulo de Servicios
+      Y el usuario elige la opcion "Servicio Recepción"
+      Y el usuario ingresa la guia "FD30776256" en "Ingrese guía o referencia:"
+      Y el usuario hace click en el boton "Agregar"
+      Y el usuario ingresa el nombre de cliente "Tst QA"
+      Y el usuario ingresa el DPI "2399479590908"
+      Y el usuario hace click en el boton "Finalizar"
+      Entonces el usuario verifica Recepcion Exitosa
+
+      Ejemplos:
+      | Escenario        | url                                         | titulo     | pais      | estacion       | correo                            | contrasenia |
+      | Recepcion-EXC    | https://qa-portal.forzadeliveryexpress.com/ | Hermes Web | Guatemala | FD EXC JUTIAPA | x_LILIAN.GARCIA@FORZADELIVERY.COM | qaqaqaqa    |
+
+      @devolucion_exc
+      Esquema del escenario:  Devolucion EXC
+      Dado el usuario selecciona la url del portal de forza "<url>" y el titulo de la pagina es "<titulo>"
+      Y usuario selecciona el pais "<pais>"
+      Y usuario ingresa la estacion "<estacion>" el correo "<correo>" y su pass "<contrasenia>"
+      Y usuario selecciona la opcion Servicios
+      Entonces el usuario visualiza el modulo de Servicios
+      Y el usuario elige la opcion "Servicio Devolución"
+      Y el usuario ingresa la guia "FD30776256" en "Ingrese guía o referencia:"
+      Y el usuario hace click en el boton "Agregar"
+      Y usuario hace click en boton "CONTINUAR"
+      Y el usuario ingresa el nombre de cliente "Tst QA"
+      Y el usuario ingresa el DPI "2399479590908"
+      Y el usuario hace click en el boton "Finalizar"
+      Entonces el usuario verifica Devolucion Exitosa
+
+      Ejemplos:
+      | Escenario      | url                                         | titulo     | pais      | estacion       | correo                            | contrasenia |
+      | Devolucion-EXC | https://qa-portal.forzadeliveryexpress.com/ | Hermes Web | Guatemala | FD EXC JUTIAPA | x_LILIAN.GARCIA@FORZADELIVERY.COM | qaqaqaqa    |
